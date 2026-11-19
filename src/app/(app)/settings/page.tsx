@@ -10,8 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useOrg } from '@/lib/hooks/useOrg'
 import { parseKeywords } from '@/lib/keywords'
 import { PROFILES } from '@/lib/signals/profiles'
+import { COUNTRY_CODES, countryName } from '@/lib/signals/genericCountry'
 
 type Seed = { id: number; keyword: string; enabled: boolean }
+
+const NO_TERMS: string[] = []
+
+type CountryOption = { code: string; name: string }
+const byName = (a: CountryOption, b: CountryOption) => a.name.localeCompare(b.name, 'en')
+// Countries with curated local lists first, then every other ISO country,
+// which gets the generic flag + domain + country-name signals.
+const CURATED_COUNTRIES: CountryOption[] = Object.values(PROFILES)
+  .map((p) => ({ code: p.code, name: p.name }))
+  .sort(byName)
+const OTHER_COUNTRIES: CountryOption[] = COUNTRY_CODES.filter((code) => !PROFILES[code])
+  .map((code) => ({ code, name: countryName(code) }))
+  .sort(byName)
 
 export function SettingsView({
   role,
@@ -19,7 +33,8 @@ export function SettingsView({
   seeds: initialSeeds,
   accountsCount,
   country = null,
-  onCountrySaved,
+  signalTerms = NO_TERMS,
+  onRankingSaved,
   orgHandle = null,
   orgStatus = null,
   onDisconnected,
@@ -29,7 +44,8 @@ export function SettingsView({
   seeds: Seed[]
   accountsCount: number | null
   country?: string | null
-  onCountrySaved?: () => void
+  signalTerms?: string[]
+  onRankingSaved?: () => void
   orgHandle?: string | null
   orgStatus?: string | null
   onDisconnected?: () => void
@@ -37,6 +53,8 @@ export function SettingsView({
   const [seeds, setSeeds] = useState(initialSeeds)
   const [newKeyword, setNewKeyword] = useState('')
   const [running, setRunning] = useState(false)
+  const [termsText, setTermsText] = useState(signalTerms.join('\n'))
+  const [savingTerms, setSavingTerms] = useState(false)
 
   // SettingsPage mounts this component as soon as org context resolves, but
   // its crawl-seeds fetch is still in flight at that point — seeds always
@@ -46,6 +64,11 @@ export function SettingsView({
   useEffect(() => {
     setSeeds(initialSeeds)
   }, [initialSeeds])
+
+  // Re-sync with the saved (normalised) terms after a save/refresh.
+  useEffect(() => {
+    setTermsText(signalTerms.join('\n'))
+  }, [signalTerms])
 
   async function addKeyword() {
     // Split the entry on commas/whitespace so pasting a city list adds one
@@ -90,10 +113,35 @@ export function SettingsView({
       body: JSON.stringify({ orgId, country: value || null }),
     })
     if (!res.ok) {
-      toast.error('Could not update country profile')
+      toast.error('Could not update country')
       return
     }
-    onCountrySaved?.()
+    onRankingSaved?.()
+  }
+
+  async function saveSignalTerms() {
+    setSavingTerms(true)
+    try {
+      const res = await fetch('/vidi/api/org/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ orgId, signalTerms: termsText }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        toast.error(
+          d.error === 'too_many_terms'
+            ? 'Too many signal words (100 at most)'
+            : d.error === 'term_too_long'
+              ? 'A signal word is too long (60 characters at most)'
+              : 'Could not save signal words',
+        )
+        return
+      }
+      toast.success('Signal words saved')
+      onRankingSaved?.()
+    } finally {
+      setSavingTerms(false)
+    }
   }
 
   async function disconnect() {
@@ -158,7 +206,7 @@ export function SettingsView({
               <Input
                 id="new-keyword"
                 value={newKeyword}
-                placeholder="City names, regions, institutions…"
+                placeholder="Places, topics, institutions, hashtags…"
                 onChange={(e) => setNewKeyword(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">Separate multiple keywords with commas or spaces.</p>
@@ -186,27 +234,59 @@ export function SettingsView({
       {role === 'owner' && (
         <Card>
           <CardHeader>
-            <CardTitle>Country profile</CardTitle>
+            <CardTitle>Ranking signals</CardTitle>
             <CardDescription>
-              Ranks the To Be Verified list by local evidence for this country. Choose None to keep the
-              list unscored.
+              Ranks the To Be Verified list by evidence that an account belongs to your community. Pick a
+              country, add your own signal words, or both. Leave both empty to keep the order accounts were
+              added.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Label htmlFor="country-profile" className="sr-only">
-              Country profile
-            </Label>
-            <select
-              id="country-profile"
-              value={country ?? ''}
-              onChange={(e) => void saveCountry(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="ranking-country">Country (optional)</Label>
+              <select
+                id="ranking-country"
+                value={country ?? ''}
+                onChange={(e) => void saveCountry(e.target.value)}
+                className="h-9 w-fit rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">None</option>
+                <optgroup label="With local signals">
+                  {CURATED_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{`${c.name} (${c.code})`}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Other countries">
+                  {OTHER_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{`${c.name} (${c.code})`}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+            <form
+              className="flex flex-col gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void saveSignalTerms()
+              }}
             >
-              <option value="">None</option>
-              {Object.values(PROFILES).map((p) => (
-                <option key={p.code} value={p.code}>{`${p.name} (${p.code})`}</option>
-              ))}
-            </select>
+              <Label htmlFor="ranking-terms">Your signal words</Label>
+              <textarea
+                id="ranking-terms"
+                value={termsText}
+                rows={5}
+                onChange={(e) => setTermsText(e.target.value)}
+                aria-describedby="ranking-terms-help"
+                className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+              />
+              <p id="ranking-terms-help" className="text-xs text-muted-foreground">
+                One per line or comma-separated. Words and phrases are matched in names and bios (+2 each).
+                Entries with a dot, like lemonde.fr, match handles on that domain (+3).
+              </p>
+              <Button type="submit" className="w-fit" disabled={savingTerms}>
+                Save signal words
+              </Button>
+            </form>
           </CardContent>
         </Card>
       )}
@@ -238,7 +318,7 @@ export function SettingsView({
 }
 
 export default function SettingsPage() {
-  const { orgId, role, loading, country, orgHandle, orgStatus, refresh } = useOrg()
+  const { orgId, role, loading, country, signalTerms, orgHandle, orgStatus, refresh } = useOrg()
   const [seeds, setSeeds] = useState<Seed[]>([])
   const [accountsCount, setAccountsCount] = useState<number | null>(null)
 
@@ -260,5 +340,5 @@ export default function SettingsPage() {
   }, [orgId, role])
 
   if (loading || !orgId || !role) return null
-  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} orgHandle={orgHandle} orgStatus={orgStatus} onDisconnected={refresh} />
+  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} signalTerms={signalTerms} onRankingSaved={refresh} orgHandle={orgHandle} orgStatus={orgStatus} onDisconnected={refresh} />
 }

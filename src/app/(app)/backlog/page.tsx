@@ -5,7 +5,7 @@ import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
 import { verifyErrorMessage } from '@/lib/verifyError'
 import { scoreAccount, STRONG_SCORE, type SignalResult } from '@/lib/signals/countryProfile'
-import { profileFor } from '@/lib/signals/profiles'
+import { buildOrgProfile } from '@/lib/signals/profiles'
 import { extractDids } from '@/lib/extractDids'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,10 +30,15 @@ const VERIFY_BATCH = 50
 // the DID. A verification issued now would embed it and not render as valid,
 // so such accounts are flagged and never bulk-selected.
 const BROKEN_HANDLE = 'handle.invalid'
+const NO_TERMS: string[] = []
 
 export default function BacklogPage() {
-  const { orgId, country } = useOrg()
-  const profile = profileFor(country)
+  const { orgId, country, signalTerms } = useOrg()
+  // Country preset and/or the org's own signal words; null means no ranking.
+  const profile = useMemo(
+    () => buildOrgProfile({ country: country ?? null, signalTerms: signalTerms ?? NO_TERMS }),
+    [country, signalTerms],
+  )
   const [items, setItems] = useState<BacklogItem[]>([])
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
@@ -49,7 +54,7 @@ export default function BacklogPage() {
 
   useEffect(load, [load])
 
-  // With a country profile set, strongest local evidence first, so the
+  // With ranking signals set, strongest evidence first, so the
   // reviewer can tick the obvious ones in bulk and spend attention on the weak
   // tail. Without one, keep the server order and skip scoring entirely.
   const scored: Scored[] = useMemo(() => {

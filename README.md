@@ -95,13 +95,26 @@ profile data is shared. What Vidi stores is described on the public `/about` pag
 2. They sign in with the verifier account's handle and tick "I'm signing in as the
    verifier account".
 3. They click Onboard. Vidi creates the org and makes them its owner.
-4. The owner picks a country profile in Settings and invites helpers.
+4. The owner picks ranking signals in Settings and invites helpers.
 
-### Adding a country profile
+### Ranking signals
 
-Scoring profiles live in code. To add one, open a PR that adds an entry to
-`src/lib/signals/profiles.ts`, keyed by ISO 3166 alpha-2 code. Orgs with no
-country set get no scoring.
+The To Be Verified list can be ranked by evidence that an account belongs to the
+verifier's community. Each org owner sets this in Settings under "Ranking
+signals": a country, their own signal words, or both. Scores add up. With
+neither, the list keeps the order accounts were added.
+
+- **Curated countries** (Belgium, France, Italy, the Netherlands, Norway, Spain)
+  have local lists of institutions, places and other words in
+  `src/lib/signals/profiles.ts`, keyed by ISO 3166 alpha-2 code. To add or
+  improve one, open a PR; native verifiers are best placed to review them.
+- **Every other country** gets a generic fallback: its flag emoji, its national
+  handle domain (none for ccTLDs used mostly generically, like `.io` or `.tv`),
+  and its name in the main European languages.
+- **Thematic verifiers** (journalists, scientists, public institutions…) type
+  their own signal words. Words and phrases are matched in names and bios (+2
+  each). Entries with a dot, like `lemonde.fr`, match handles on that domain
+  (+3).
 
 ### Moving to another domain
 
