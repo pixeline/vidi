@@ -1,7 +1,7 @@
 import { AtpAgent } from '@atproto/api'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client'
-import { crawlSeeds } from '../db/schema'
+import { crawlSeeds, orgs } from '../db/schema'
 
 const TYPEAHEAD_URL = () => process.env.VIDI_TYPEAHEAD_URL ?? 'https://typeahead.waow.tech'
 
@@ -20,7 +20,12 @@ const TYPEAHEAD_URL = () => process.env.VIDI_TYPEAHEAD_URL ?? 'https://typeahead
 export async function runKeywordSeed(agent: AtpAgent): Promise<string[]> {
   void agent
   const typeaheadAgent = new AtpAgent({ service: TYPEAHEAD_URL() })
-  const seeds = await db.select().from(crawlSeeds).where(eq(crawlSeeds.enabled, true))
+  // Only seeds of orgs still connected: a disconnected org's keywords pause.
+  const seeds = await db
+    .select({ keyword: crawlSeeds.keyword })
+    .from(crawlSeeds)
+    .innerJoin(orgs, eq(orgs.id, crawlSeeds.orgId))
+    .where(and(eq(crawlSeeds.enabled, true), eq(orgs.status, 'active')))
   const dids = new Set<string>()
   // Several orgs may share a keyword; query each distinct one once.
   const keywords = new Set(seeds.map((s) => s.keyword))

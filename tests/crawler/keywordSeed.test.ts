@@ -1,16 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-let seedRows: Array<{ id?: number; orgId?: number; keyword: string; enabled: boolean }> = []
+type SeedRow = { id?: number; orgId?: number; keyword: string; enabled: boolean; orgStatus?: string }
+let seedRows: SeedRow[] = []
+let joined: unknown[] = []
 
-vi.mock('../../src/db/client', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: async () => seedRows,
-      }),
-    }),
-  },
+// Columns are plain names so the mocked where() can apply eq/and conditions
+// to the rows; a row's org status (from the orgs join) defaults to active.
+vi.mock('../../src/db/schema', () => ({
+  crawlSeeds: { keyword: 'keyword', enabled: 'enabled', orgId: 'orgId' },
+  orgs: { id: 'orgs.id', status: 'orgStatus' },
 }))
+vi.mock('drizzle-orm', () => ({
+  and: (...conds: unknown[]) => ({ and: conds }),
+  eq: (col: string, val: unknown) => ({ col, val }),
+}))
+const matches = (row: SeedRow, cond: any): boolean =>
+  cond.and
+    ? cond.and.every((c: unknown) => matches(row, c))
+    : ({ orgStatus: 'active', ...row } as Record<string, unknown>)[cond.col] === cond.val
+vi.mock('../../src/db/client', () => {
+  const where = async (cond: unknown) => seedRows.filter((r) => matches(r, cond))
+  return {
+    db: {
+      select: () => ({
+        from: () => ({
+          innerJoin: (table: unknown, on: unknown) => {
+            joined.push([table, on])
+            return { where }
+          },
+          where,
+        }),
+      }),
+    },
+  }
+})
 
 const searchActorsTypeahead = vi.fn()
 const ctorSpy = vi.fn()
@@ -31,6 +54,7 @@ describe('runKeywordSeed', () => {
 
   beforeEach(() => {
     seedRows = []
+    joined = []
     searchActorsTypeahead.mockReset()
     ctorSpy.mockReset()
     delete process.env.VIDI_TYPEAHEAD_URL
@@ -88,6 +112,21 @@ describe('runKeywordSeed', () => {
 
     expect(searchActorsTypeahead).toHaveBeenCalledTimes(1)
     expect(searchActorsTypeahead).toHaveBeenCalledWith({ q: 'roma', limit: 100 })
+  })
+
+  it('skips keywords of a disconnected org', async () => {
+    seedRows = [
+      { orgId: 1, keyword: 'brussels', enabled: true, orgStatus: 'active' },
+      { orgId: 2, keyword: 'roma', enabled: true, orgStatus: 'disconnected' },
+      { orgId: 1, keyword: 'gent', enabled: false, orgStatus: 'active' },
+    ]
+    searchActorsTypeahead.mockResolvedValue({ data: { actors: [] } })
+
+    await runKeywordSeed({} as any)
+
+    expect(joined).toHaveLength(1)
+    expect(searchActorsTypeahead).toHaveBeenCalledTimes(1)
+    expect(searchActorsTypeahead).toHaveBeenCalledWith({ q: 'brussels', limit: 100 })
   })
 
   it('returns an empty array when there are no enabled seeds', async () => {
