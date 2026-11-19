@@ -28,6 +28,11 @@ export async function GET() {
   const active = activeRows.find((r) => r.orgId === session.activeOrgId) ?? activeRows[0]
 
   const eligible = await canOnboard(actor.did)
+  // The org the actor *is* (did === actor.did), if any — lets a disconnected
+  // owner see Reconnect even though their membership row is still active.
+  const ownOrgRows = await db.select().from(orgs).where(eq(orgs.did, actor.did))
+  const ownOrg = ownOrgRows.find((o) => o.did === actor.did)
+  const ownOrgStatus = ownOrg ? (ownOrg.status === 'active' ? 'active' : 'disconnected') : null
   // The logged-in profile's avatar (cached); null falls back to initials/icon.
   const avatar = await getActorAvatar(actor.did)
 
@@ -38,10 +43,12 @@ export async function GET() {
   let orgHandle: string | null = null
   let verifiedCount: number | null = null
   let country: string | null = null
+  let orgStatus: string | null = null
   if (active) {
     const org = orgById.get(active.orgId)
     orgHandle = org?.handle ?? null
     country = org?.country ?? null
+    orgStatus = org?.status ?? null
     // An owner's display identity is the org's own handle; a helper's handle
     // is captured at invite time on the membership row.
     handle = active.role === 'owner' ? (org?.handle ?? active.handle ?? null) : (active.handle ?? null)
@@ -71,6 +78,8 @@ export async function GET() {
     avatar,
     verifiedCount,
     country,
+    orgStatus,
+    ownOrgStatus,
     orgs: orgList,
   })
 }

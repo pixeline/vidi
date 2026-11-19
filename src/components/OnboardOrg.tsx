@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function OnboardOrg({ onOnboarded }: { onOnboarded: () => void }) {
+export function OnboardOrg({ onOnboarded, reconnect = false }: { onOnboarded: () => void; reconnect?: boolean }) {
   const [loading, setLoading] = useState(false)
 
   async function onboard() {
@@ -24,7 +24,7 @@ export function OnboardOrg({ onOnboarded }: { onOnboarded: () => void }) {
         toast.error(message)
         return
       }
-      toast.success('Org onboarded')
+      toast.success(reconnect ? 'Org reconnected' : 'Org onboarded')
       onOnboarded()
     } catch {
       toast.error('Could not onboard this org')
@@ -36,15 +36,16 @@ export function OnboardOrg({ onOnboarded }: { onOnboarded: () => void }) {
   return (
     <Card className="mb-6 border-primary/30 bg-primary/5">
       <CardHeader>
-        <CardTitle>Onboard this org</CardTitle>
+        <CardTitle>{reconnect ? 'Reconnect this org' : 'Onboard this org'}</CardTitle>
         <CardDescription>
-          No organization is set up for your account yet. Onboard it now to start searching and
-          verifying accounts.
+          {reconnect
+            ? 'Vidi is disconnected from your verifier account. Reconnect it to let members verify again.'
+            : 'No organization is set up for your account yet. Onboard it now to start searching and verifying accounts.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Button onClick={onboard} disabled={loading}>
-          {loading ? 'Onboarding…' : 'Onboard this org'}
+          {reconnect ? (loading ? 'Reconnecting…' : 'Reconnect') : loading ? 'Onboarding…' : 'Onboard this org'}
         </Button>
       </CardContent>
     </Card>

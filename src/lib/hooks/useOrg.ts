@@ -4,6 +4,7 @@ import { subscribeVerifiedCountChanged } from '../verifiedCountBus'
 
 // Org context resolved from /vidi/api/org/context (the session's selected org).
 export type OrgSummary = { orgId: number; handle: string; role: 'owner' | 'helper' }
+export type OwnOrgStatus = 'active' | 'disconnected' | null
 
 export function useOrg() {
   const [orgId, setOrgId] = useState<number | null>(null)
@@ -17,6 +18,9 @@ export function useOrg() {
   const [verifiedCount, setVerifiedCount] = useState<number | null>(null)
   const [country, setCountry] = useState<string | null>(null)
   const [orgs, setOrgs] = useState<OrgSummary[]>([])
+  // Status of the selected org, and of the org the actor *is* (if any).
+  const [orgStatus, setOrgStatus] = useState<string | null>(null)
+  const [ownOrgStatus, setOwnOrgStatus] = useState<OwnOrgStatus>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -33,6 +37,8 @@ export function useOrg() {
       setVerifiedCount(d.verifiedCount ?? null)
       setCountry(d.country ?? null)
       setOrgs(d.orgs ?? [])
+      setOrgStatus(d.orgStatus ?? null)
+      setOwnOrgStatus(d.ownOrgStatus ?? null)
     } catch {
       setAuthenticated(false)
       setOrgId(null)
@@ -44,6 +50,8 @@ export function useOrg() {
       setVerifiedCount(null)
       setCountry(null)
       setOrgs([])
+      setOrgStatus(null)
+      setOwnOrgStatus(null)
     } finally {
       setLoading(false)
     }
@@ -70,5 +78,5 @@ export function useOrg() {
   // the new count without a full page reload — see verifiedCountBus.ts.
   useEffect(() => subscribeVerifiedCountChanged(refresh), [refresh])
 
-  return { orgId, setOrgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, orgs, selectOrg, refresh }
+  return { orgId, setOrgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, orgs, orgStatus, ownOrgStatus, selectOrg, refresh }
 }

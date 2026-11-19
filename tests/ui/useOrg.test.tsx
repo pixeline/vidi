@@ -19,6 +19,16 @@ describe('useOrg', () => {
     await waitFor(() => expect(result.current.verifiedCount).toBe(7))
   })
 
+  it('exposes orgStatus and ownOrgStatus from the org/context response', async () => {
+    ;(global.fetch as any).mockResolvedValue({
+      status: 200,
+      json: async () => ({ orgId: 1, role: 'owner', orgStatus: 'disconnected', ownOrgStatus: 'disconnected' }),
+    })
+    const { result } = renderHook(() => useOrg())
+    await waitFor(() => expect(result.current.orgStatus).toBe('disconnected'))
+    expect(result.current.ownOrgStatus).toBe('disconnected')
+  })
+
   it('re-fetches org context when notified via the verifiedCountBus', async () => {
     let call = 0
     ;(global.fetch as any).mockImplementation(async () => {

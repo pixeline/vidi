@@ -36,7 +36,7 @@ function ActorIdentity({ handle, avatar }: { handle: string | null; avatar: stri
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { orgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, orgs, selectOrg, refresh } = useOrg()
+  const { orgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, orgs, orgStatus, ownOrgStatus, selectOrg, refresh } = useOrg()
   // Settings (crawl keywords) is open to any active member — owner or helper —
   // not just the owner. Hidden for non-members (no org context to manage).
   const navLinks = role ? [...BASE_NAV_LINKS, { href: '/settings', label: 'Settings' }] : BASE_NAV_LINKS
@@ -80,6 +80,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const orgResolved = !loading && authenticated && orgId == null
+  // An eligible account onboards when it has no org yet, and reconnects when
+  // its own org was disconnected (its owner membership survives disconnect).
+  const showOnboard =
+    canOnboard && ownOrgStatus !== 'active' && (orgId == null || ownOrgStatus === 'disconnected')
+  const reconnect = ownOrgStatus === 'disconnected'
+  // The selected org's owner sees Reconnect instead of the paused banner.
+  const showPausedBanner = orgId != null && orgStatus != null && orgStatus !== 'active' && !(reconnect && role === 'owner')
 
   return (
     <div className="flex flex-1 flex-col">
@@ -146,7 +153,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        {orgResolved && canOnboard && <OnboardOrg onOnboarded={refresh} />}
+        {showOnboard && <OnboardOrg onOnboarded={refresh} reconnect={reconnect} />}
+        {showPausedBanner && (
+          <Card className="mb-6 border-destructive/30 bg-destructive/5">
+            <CardHeader>
+              <CardDescription>
+                This org has disconnected Vidi. Verifying is paused until the owner reconnects.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
         {orgResolved && !canOnboard && (
           <Card className="mb-6">
             <CardHeader>

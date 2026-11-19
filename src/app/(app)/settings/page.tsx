@@ -21,6 +21,7 @@ export function SettingsView({
   country = null,
   onCountrySaved,
   orgHandle = null,
+  orgStatus = null,
   onDisconnected,
 }: {
   role: string
@@ -30,6 +31,7 @@ export function SettingsView({
   country?: string | null
   onCountrySaved?: () => void
   orgHandle?: string | null
+  orgStatus?: string | null
   onDisconnected?: () => void
 }) {
   const [seeds, setSeeds] = useState(initialSeeds)
@@ -215,7 +217,7 @@ export function SettingsView({
         </Button>
       )}
 
-      {role === 'owner' && (
+      {role === 'owner' && orgStatus !== 'disconnected' && (
         <Card>
           <CardHeader>
             <CardTitle>Disconnect Vidi</CardTitle>
@@ -236,7 +238,7 @@ export function SettingsView({
 }
 
 export default function SettingsPage() {
-  const { orgId, role, loading, country, orgHandle, refresh } = useOrg()
+  const { orgId, role, loading, country, orgHandle, orgStatus, refresh } = useOrg()
   const [seeds, setSeeds] = useState<Seed[]>([])
   const [accountsCount, setAccountsCount] = useState<number | null>(null)
 
@@ -258,5 +260,5 @@ export default function SettingsPage() {
   }, [orgId, role])
 
   if (loading || !orgId || !role) return null
-  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} orgHandle={orgHandle} onDisconnected={refresh} />
+  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} orgHandle={orgHandle} orgStatus={orgStatus} onDisconnected={refresh} />
 }

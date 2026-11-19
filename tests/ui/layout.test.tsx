@@ -157,4 +157,69 @@ describe('AppLayout', () => {
     expect(screen.queryByRole('combobox', { name: 'Organization' })).toBeNull()
     expect(screen.getByText('be.example')).toBeTruthy()
   })
+
+  describe('disconnected orgs', () => {
+    const base = {
+      handle: 'me', avatar: null, authenticated: true, loading: false, verifiedCount: 0,
+      selectOrg: vi.fn(), refresh: vi.fn(),
+    }
+
+    it('offers Reconnect to the owner of a disconnected org', () => {
+      useOrgMock.mockReturnValue({
+        ...base, orgId: 1, role: 'owner', canOnboard: true, orgHandle: 'be.example',
+        orgs: [{ orgId: 1, handle: 'be.example', role: 'owner' }],
+        orgStatus: 'disconnected', ownOrgStatus: 'disconnected',
+      })
+      render(<AppLayout>{null}</AppLayout>)
+      expect(screen.getByText('Reconnect this org')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Reconnect' })).toBeTruthy()
+    })
+
+    it('does not offer Reconnect or Onboard to the owner of an active org', () => {
+      useOrgMock.mockReturnValue({
+        ...base, orgId: 1, role: 'owner', canOnboard: true, orgHandle: 'be.example',
+        orgs: [{ orgId: 1, handle: 'be.example', role: 'owner' }],
+        orgStatus: 'active', ownOrgStatus: 'active',
+      })
+      render(<AppLayout>{null}</AppLayout>)
+      expect(screen.queryByText('Reconnect this org')).toBeNull()
+      expect(screen.queryByRole('button', { name: /reconnect|onboard/i })).toBeNull()
+      expect(screen.queryByText(/has disconnected Vidi/)).toBeNull()
+    })
+
+    it('does not offer Onboard to an eligible owner of an active org who has selected another org', () => {
+      useOrgMock.mockReturnValue({
+        ...base, orgId: 2, role: 'helper', canOnboard: true, orgHandle: 'it.example',
+        orgs: [
+          { orgId: 1, handle: 'be.example', role: 'owner' },
+          { orgId: 2, handle: 'it.example', role: 'helper' },
+        ],
+        orgStatus: 'active', ownOrgStatus: 'active',
+      })
+      render(<AppLayout>{null}</AppLayout>)
+      expect(screen.queryByRole('button', { name: /reconnect|onboard/i })).toBeNull()
+    })
+
+    it('still offers Onboard to an eligible account with no org yet', () => {
+      useOrgMock.mockReturnValue({
+        ...base, orgId: null, role: null, canOnboard: true, orgHandle: null, orgs: [],
+        orgStatus: null, ownOrgStatus: null,
+      })
+      render(<AppLayout>{null}</AppLayout>)
+      expect(screen.getByRole('button', { name: 'Onboard this org' })).toBeTruthy()
+    })
+
+    it('shows a paused banner and no Reconnect to a helper of a disconnected org', () => {
+      useOrgMock.mockReturnValue({
+        ...base, orgId: 1, role: 'helper', canOnboard: false, orgHandle: 'be.example',
+        orgs: [{ orgId: 1, handle: 'be.example', role: 'helper' }],
+        orgStatus: 'disconnected', ownOrgStatus: null,
+      })
+      render(<AppLayout>{null}</AppLayout>)
+      expect(
+        screen.getByText('This org has disconnected Vidi. Verifying is paused until the owner reconnects.'),
+      ).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /reconnect/i })).toBeNull()
+    })
+  })
 })

@@ -69,6 +69,19 @@ describe('SettingsView disconnect', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('hides the disconnect card when the org is already disconnected', () => {
+    render(
+      <SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" orgStatus="disconnected" />,
+    )
+    expect(screen.queryByRole('button', { name: /disconnect vidi/i })).toBeNull()
+    expect(screen.queryByText('Disconnect Vidi')).toBeNull()
+  })
+
+  it('shows the disconnect card to the owner of an active org', () => {
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" orgStatus="active" />)
+    expect(screen.getByRole('button', { name: 'Disconnect Vidi from @belgium-atmosphe.re' })).toBeTruthy()
+  })
+
   it('hides the disconnect button from a helper', () => {
     render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" />)
     expect(screen.queryByRole('button', { name: /disconnect vidi/i })).toBeNull()

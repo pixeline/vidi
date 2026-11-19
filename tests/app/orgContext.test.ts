@@ -68,7 +68,7 @@ describe('GET /api/org/context', () => {
     canOnboard.mockResolvedValue(true)
     countOrgVerifications.mockResolvedValue(42)
     rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'stale.owner' }]
-    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE' }]
+    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE', status: 'active' }]
 
     const res = await GET()
     expect(res.status).toBe(200)
@@ -81,6 +81,8 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 42,
       country: 'BE',
+      orgStatus: 'active',
+      ownOrgStatus: 'active',
       orgs: [{ orgId: 7, handle: 'org.example.com', role: 'owner' }],
     })
     expect(countOrgVerifications).toHaveBeenCalledWith('did:plc:org')
@@ -91,7 +93,7 @@ describe('GET /api/org/context', () => {
     canOnboard.mockResolvedValue(false)
     countOrgVerifications.mockResolvedValue(5)
     rowsHolder.memberRows = [{ orgId: 7, role: 'helper', status: 'active', handle: 'pixeline.be' }]
-    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com' }]
+    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', status: 'active' }]
 
     const res = await GET()
     expect(await res.json()).toEqual({
@@ -103,6 +105,8 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 5,
       country: null,
+      orgStatus: 'active',
+      ownOrgStatus: null,
       orgs: [{ orgId: 7, handle: 'org.example.com', role: 'helper' }],
     })
   })
@@ -135,6 +139,8 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: null,
       country: null,
+      orgStatus: null,
+      ownOrgStatus: null,
       orgs: [],
     })
   })
@@ -148,6 +154,49 @@ describe('GET /api/org/context', () => {
     const body = await res.json()
     expect(body.orgId).toBeNull()
     expect(body.canOnboard).toBe(true)
+  })
+
+  describe('org status', () => {
+    it('reports a disconnected own org as ownOrgStatus and the selected orgStatus', async () => {
+      getActor.mockResolvedValue({ did: 'did:plc:org' })
+      canOnboard.mockResolvedValue(true)
+      countOrgVerifications.mockResolvedValue(3)
+      rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'org.example.com' }]
+      rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', status: 'disconnected' }]
+      const body = await (await GET()).json()
+      expect(body.orgStatus).toBe('disconnected')
+      expect(body.ownOrgStatus).toBe('disconnected')
+    })
+
+    it('reports ownOrgStatus for an own org even without an active membership row', async () => {
+      getActor.mockResolvedValue({ did: 'did:plc:org' })
+      canOnboard.mockResolvedValue(true)
+      rowsHolder.memberRows = []
+      rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', status: 'disconnected' }]
+      const body = await (await GET()).json()
+      expect(body.orgId).toBeNull()
+      expect(body.orgStatus).toBeNull()
+      expect(body.ownOrgStatus).toBe('disconnected')
+    })
+
+    it('reports the selected org status separately from the own org status', async () => {
+      getActor.mockResolvedValue({ did: 'did:plc:me' })
+      canOnboard.mockResolvedValue(true)
+      countOrgVerifications.mockResolvedValue(1)
+      sessionHolder.activeOrgId = 2
+      rowsHolder.memberRows = [
+        { orgId: 1, role: 'owner', status: 'active', handle: 'me' },
+        { orgId: 2, role: 'helper', status: 'active', handle: 'me' },
+      ]
+      rowsHolder.orgRows = [
+        { id: 1, did: 'did:plc:me', handle: 'me.example', status: 'active' },
+        { id: 2, did: 'did:plc:it', handle: 'it.example', status: 'disconnected' },
+      ]
+      const body = await (await GET()).json()
+      expect(body.orgId).toBe(2)
+      expect(body.orgStatus).toBe('disconnected')
+      expect(body.ownOrgStatus).toBe('active')
+    })
   })
 
   describe('several memberships', () => {
