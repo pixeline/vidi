@@ -32,7 +32,7 @@ export async function GET() {
   const avatar = await getActorAvatar(actor.did)
 
   let handle: string | null = null
-  // The Trusted Verifier org's own handle (e.g. belgium-atmosphe.re), shown in
+  // The Trusted Verifier org's own handle (e.g. verifier.example.org), shown in
   // the header regardless of the caller's role — it identifies who we verify
   // *for*, whereas `handle` is the caller's own display identity.
   let orgHandle: string | null = null

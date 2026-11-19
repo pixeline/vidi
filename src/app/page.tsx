@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { User } from 'lucide-react'
 import { toast } from 'sonner'
@@ -200,6 +201,12 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
+            <Link
+              href="/about"
+              className="text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
+            >
+              About &amp; data
+            </Link>
           </form>
         </CardContent>
       </Card>

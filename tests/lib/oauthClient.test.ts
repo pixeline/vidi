@@ -14,7 +14,7 @@ const TEST_JWK = {
 
 let GET: any
 beforeAll(async () => {
-  process.env.VIDI_PUBLIC_URL = 'https://belgium-atmosphe.re/vidi'
+  process.env.VIDI_PUBLIC_URL = 'https://vidi.example.org/vidi'
   process.env.VIDI_OAUTH_PRIVATE_JWK = JSON.stringify(TEST_JWK)
   ;({ GET } = await import('../../src/app/client-metadata.json/route'))
 })
@@ -22,8 +22,8 @@ beforeAll(async () => {
 describe('client-metadata', () => {
   it('advertises the correct client_id and scope', async () => {
     const body = await (await GET()).json()
-    expect(body.client_id).toBe('https://belgium-atmosphe.re/vidi/client-metadata.json')
-    expect(body.redirect_uris).toContain('https://belgium-atmosphe.re/vidi/api/auth/callback')
+    expect(body.client_id).toBe('https://vidi.example.org/vidi/client-metadata.json')
+    expect(body.redirect_uris).toContain('https://vidi.example.org/vidi/api/auth/callback')
     expect(body.scope).toBe(ORG_SCOPE)
     expect(body.dpop_bound_access_tokens).toBe(true)
   })
@@ -32,8 +32,15 @@ describe('client-metadata', () => {
     const body = await (await GET()).json()
     expect(body.token_endpoint_auth_method).toBe('private_key_jwt')
     expect(body.token_endpoint_auth_signing_alg).toBe('ES256')
-    expect(body.jwks_uri).toBe('https://belgium-atmosphe.re/vidi/jwks.json')
+    expect(body.jwks_uri).toBe('https://vidi.example.org/vidi/jwks.json')
     expect(body.jwks).toBeUndefined()
+  })
+})
+
+describe('client-metadata policy', () => {
+  it('links the public data page as policy_uri', async () => {
+    const body = await (await GET()).json()
+    expect(body.policy_uri).toBe('https://vidi.example.org/vidi/about')
   })
 })
 
@@ -51,7 +58,7 @@ describe('isLoopbackBase', () => {
   })
 
   it('is false for a real https host', () => {
-    expect(isLoopbackBase('https://belgium-atmosphe.re/vidi')).toBe(false)
+    expect(isLoopbackBase('https://vidi.example.org/vidi')).toBe(false)
   })
 })
 

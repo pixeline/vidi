@@ -82,3 +82,30 @@ On every push to the `main` branch, the GitHub Actions workflow automatically:
    - Pulls the latest Docker image
    - Runs database migrations using `npx tsx src/db/migrate.ts`
    - Starts the application with `docker compose up -d`
+
+## Hosting several verifiers
+
+Vidi can serve several Trusted Verifier organizations from one deployment. Each
+org has its own members, backlog, keyword seeds and activity log. Crawled public
+profile data is shared. What Vidi stores is described on the public `/about` page.
+
+### Onboarding a verifier
+
+1. The verifier must be on the allowlist or in `trusted_verifiers`.
+2. They sign in with the verifier account's handle and tick "I'm signing in as the
+   verifier account".
+3. They click Onboard. Vidi creates the org and makes them its owner.
+4. The owner picks a country profile in Settings and invites helpers.
+
+### Adding a country profile
+
+Scoring profiles live in code. To add one, open a PR that adds an entry to
+`src/lib/signals/profiles.ts`, keyed by ISO 3166 alpha-2 code. Orgs with no
+country set get no scoring.
+
+### Moving to another domain
+
+The OAuth `client_id` is derived from `VIDI_PUBLIC_URL`. If you change the URL, the
+`client_id` changes too, so every existing session stops working and everyone must
+sign in again. Org owners keep their data but must sign in with the verifier
+account again so Vidi gets a new token.

@@ -88,6 +88,7 @@ function confidentialClientMetadata(publicUrl: string) {
     client_id: `${publicUrl}/client-metadata.json`,
     client_name: 'Vidi',
     client_uri: publicUrl,
+    policy_uri: `${publicUrl}/about`,
     redirect_uris: [`${publicUrl}/api/auth/callback`] as [string, ...string[]],
     scope: ORG_SCOPE,
     grant_types: ['authorization_code', 'refresh_token'] as [
