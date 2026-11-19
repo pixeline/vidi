@@ -1,4 +1,5 @@
 import type { AtpAgent } from '@atproto/api'
+import { notInArray } from 'drizzle-orm'
 import { db } from '../db/client'
 import { trustedVerifiers } from '../db/schema'
 
@@ -24,5 +25,10 @@ export async function syncTrustedVerifiers(agent: AtpAgent): Promise<string[]> {
     await db.insert(trustedVerifiers).values({ did: entry.did, handle: entry.handle, sourceListUri: uris[0] })
       .onConflictDoUpdate({ target: trustedVerifiers.did, set: { handle: entry.handle } })
   }
-  return entries.map((e) => e.did)
+  const dids = entries.map((e) => e.did)
+  // The table authorizes onboarding, so drop verifiers removed from the lists.
+  // Reaching here means every list was read in full (a failed read throws), so
+  // the result is complete. With no list configured, leave the table alone.
+  if (uris.length > 0) await db.delete(trustedVerifiers).where(notInArray(trustedVerifiers.did, dids))
+  return dids
 }
