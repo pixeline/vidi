@@ -5,6 +5,30 @@ import { buildAtprotoLoopbackClientId } from '@atproto/oauth-types'
 import { PgStateStore, PgSessionStore } from './stores'
 import { requireEnv } from '../env'
 
+/** Scope for verifier org accounts: may only write verification records. */
+export const ORG_SCOPE = 'atproto repo:app.bsky.graph.verification'
+/** Scope for helpers/members: identity only. */
+export const MEMBER_SCOPE = 'atproto'
+
+/**
+ * True when a granted scope string lets us write verification records:
+ * a `repo:app.bsky.graph.verification` token (optionally with `?action=...`)
+ * or the legacy `transition:generic` that older org sessions hold.
+ *
+ * Deliberately rejects `repo:*` and the `repo?collection=...` form: those are
+ * fail-safe false negatives (we never request them, so a miss only asks the
+ * user to sign in again). The `atproto` token itself is guaranteed by
+ * @atproto/oauth-client's token-response validation, so it is not re-checked.
+ */
+export function hasVerificationScope(scope: string): boolean {
+  return scope.split(/\s+/).some((token) => {
+    if (token === 'transition:generic') return true
+    if (!token.startsWith('repo:')) return false
+    const collection = token.slice('repo:'.length).split('?')[0]
+    return collection === 'app.bsky.graph.verification'
+  })
+}
+
 const base = () => requireEnv('VIDI_PUBLIC_URL')
 
 /**
@@ -40,7 +64,7 @@ export function isLoopbackBase(base: string): boolean {
 function loopbackClientMetadata(publicUrl: string) {
   const parsed = new URL(publicUrl)
   const redirectUri = `http://127.0.0.1${parsed.port ? `:${parsed.port}` : ''}${parsed.pathname.replace(/\/$/, '')}/api/auth/callback`
-  const scope = 'atproto transition:generic'
+  const scope = ORG_SCOPE
   const clientId = buildAtprotoLoopbackClientId({ scope, redirect_uris: [redirectUri] })
   return {
     client_id: clientId,
@@ -64,8 +88,9 @@ function confidentialClientMetadata(publicUrl: string) {
     client_id: `${publicUrl}/client-metadata.json`,
     client_name: 'Vidi',
     client_uri: publicUrl,
+    policy_uri: `${publicUrl}/about`,
     redirect_uris: [`${publicUrl}/api/auth/callback`] as [string, ...string[]],
-    scope: 'atproto transition:generic',
+    scope: ORG_SCOPE,
     grant_types: ['authorization_code', 'refresh_token'] as [
       'authorization_code',
       'refresh_token',

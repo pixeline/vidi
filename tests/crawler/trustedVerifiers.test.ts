@@ -2,8 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const inserted: Record<string, unknown>[] = []
 const conflicts: unknown[] = []
+const deletes = vi.hoisted(() => [] as { where: unknown }[])
+vi.mock('drizzle-orm', async () => {
+  const actual = await vi.importActual<typeof import('drizzle-orm')>('drizzle-orm')
+  return { ...actual, notInArray: (_col: unknown, values: string[]) => ({ notIn: values }) }
+})
 vi.mock('../../src/db/client', () => ({
   db: {
+    delete: () => {
+      const entry: { where: unknown } = { where: undefined }
+      deletes.push(entry)
+      return Object.assign(Promise.resolve(), {
+        where: async (cond: unknown) => {
+          entry.where = cond
+        },
+      })
+    },
     insert: () => ({
       values: (values: Record<string, unknown>) => ({
         onConflictDoUpdate: async (conflict: unknown) => {
@@ -48,7 +62,29 @@ describe('syncTrustedVerifiers', () => {
   beforeEach(() => {
     inserted.length = 0
     conflicts.length = 0
+    deletes.length = 0
     process.env.TRUSTED_VERIFIER_LIST_URIS = 'at://l/a'
+  })
+
+  it('prunes verifiers no longer on the lists, keeping the returned DIDs', async () => {
+    await syncTrustedVerifiers(agent)
+    expect(deletes).toHaveLength(1)
+    expect((deletes[0].where as { notIn: string[] }).notIn.sort()).toEqual(['did:plc:a1', 'did:plc:a2'])
+  })
+
+  it('does not prune when no list URI is configured', async () => {
+    process.env.TRUSTED_VERIFIER_LIST_URIS = ''
+    await syncTrustedVerifiers(agent)
+    expect(deletes).toHaveLength(0)
+  })
+
+  it('does not prune when a list fetch throws', async () => {
+    const failing = {
+      app: { bsky: { graph: { getList: async () => { throw new Error('appview down') } } } },
+    } as any
+    await expect(syncTrustedVerifiers(failing)).rejects.toThrow('appview down')
+    expect(deletes).toHaveLength(0)
+    expect(inserted).toHaveLength(0)
   })
 
   it('persists each verifier with its handle, refreshing the handle on re-crawl', async () => {

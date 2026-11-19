@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
-import { belgianSignals, type BelgianSignals } from '@/lib/belgianSignals'
+import { verifyErrorMessage } from '@/lib/verifyError'
+import { scoreAccount, STRONG_SCORE, type SignalResult } from '@/lib/signals/countryProfile'
+import { buildOrgProfile } from '@/lib/signals/profiles'
 import { extractDids } from '@/lib/extractDids'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,19 +22,23 @@ type BacklogItem = {
   verifiers?: { did: string; handle: string | null }[]
 }
 
-type Scored = BacklogItem & { be: BelgianSignals }
+type Scored = BacklogItem & { sig: SignalResult }
 
 // Mirrors /api/verify's default VIDI_BATCH_MAX so bulk verifies never trip the cap.
 const VERIFY_BATCH = 50
-// Score ≥ 3 was ~90% precise in the list-grower's manual audit (one solid signal).
-const STRONG_SCORE = 3
 // The AppView reports this when a handle's DNS/well-known no longer points at
 // the DID. A verification issued now would embed it and not render as valid,
 // so such accounts are flagged and never bulk-selected.
 const BROKEN_HANDLE = 'handle.invalid'
+const NO_TERMS: string[] = []
 
 export default function BacklogPage() {
-  const { orgId } = useOrg()
+  const { orgId, country, signalTerms } = useOrg()
+  // Country preset and/or the org's own signal words; null means no ranking.
+  const profile = useMemo(
+    () => buildOrgProfile({ country: country ?? null, signalTerms: signalTerms ?? NO_TERMS }),
+    [country, signalTerms],
+  )
   const [items, setItems] = useState<BacklogItem[]>([])
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
@@ -48,15 +54,17 @@ export default function BacklogPage() {
 
   useEffect(load, [load])
 
-  // Strongest Belgian evidence first, so the reviewer can tick the obvious
-  // ones in bulk and spend attention on the weak tail.
-  const scored: Scored[] = useMemo(
-    () =>
-      items
-        .map((i) => ({ ...i, be: belgianSignals({ handle: i.handle, displayName: i.displayName, description: i.description }) }))
-        .sort((a, b) => b.be.score - a.be.score),
-    [items],
-  )
+  // With ranking signals set, strongest evidence first, so the
+  // reviewer can tick the obvious ones in bulk and spend attention on the weak
+  // tail. Without one, keep the server order and skip scoring entirely.
+  const scored: Scored[] = useMemo(() => {
+    const empty: SignalResult = { score: 0, signals: [] }
+    const list = items.map((i) => ({
+      ...i,
+      sig: profile ? scoreAccount(profile, { handle: i.handle, displayName: i.displayName, description: i.description }) : empty,
+    }))
+    return profile ? list.sort((a, b) => b.sig.score - a.sig.score) : list
+  }, [items, profile])
 
   function drop(dids: string[]) {
     const gone = new Set(dids)
@@ -84,7 +92,7 @@ export default function BacklogPage() {
       }),
     })
     if (!res.ok) {
-      toast.error('Verification failed')
+      toast.error(await verifyErrorMessage(res))
       return
     }
     const { results } = await res.json()
@@ -133,6 +141,8 @@ export default function BacklogPage() {
         })
         if (!res.ok) {
           failed += targets.length - i
+          const message = await verifyErrorMessage(res)
+          if (message !== 'Verification failed') toast.error(message)
           break
         }
         const { results } = (await res.json()) as { results: { did: string; outcome: string }[] }
@@ -198,7 +208,7 @@ export default function BacklogPage() {
     }
   }
 
-  const strong = scored.filter((i) => i.be.score >= STRONG_SCORE && i.handle !== BROKEN_HANDLE)
+  const strong = scored.filter((i) => i.sig.score >= STRONG_SCORE && i.handle !== BROKEN_HANDLE)
 
   return (
     <div className="space-y-6">
@@ -226,7 +236,7 @@ export default function BacklogPage() {
       {scored.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            {busy ?? `${scored.length} pending · ${strong.length} with strong Belgian signals · ${sel.size} selected`}
+            {busy ?? `${scored.length} pending${profile ? ` · ${strong.length} with strong ${profile.adjective} signals` : ''} · ${sel.size} selected`}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setSel(new Set(strong.map((i) => i.subjectDid)))}>
@@ -278,13 +288,15 @@ export default function BacklogPage() {
               badges={
                 <>
                   {i.handle === BROKEN_HANDLE && <Badge variant="destructive">handle not resolving</Badge>}
-                  <Badge
-                    variant={i.be.score >= STRONG_SCORE ? 'default' : i.be.score > 0 ? 'secondary' : 'outline'}
-                    title="Belgian evidence score"
-                  >
-                    BE {i.be.score}
-                    {i.be.signals.length > 0 && ` · ${i.be.signals.join(' · ')}`}
-                  </Badge>
+                  {profile && (
+                    <Badge
+                      variant={i.sig.score >= STRONG_SCORE ? 'default' : i.sig.score > 0 ? 'secondary' : 'outline'}
+                      title={`${profile.adjective} evidence score`}
+                    >
+                      {`${profile.code} ${i.sig.score}`}
+                      {i.sig.signals.length > 0 && ` · ${i.sig.signals.join(' · ')}`}
+                    </Badge>
+                  )}
                 </>
               }
               actions={

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
-vi.mock('@/lib/hooks/useOrg', () => ({ useOrg: () => ({ orgId: 1 }) }))
+const orgState = vi.hoisted(() => ({ country: 'BE' as string | null, signalTerms: [] as string[] }))
+vi.mock('@/lib/hooks/useOrg', () => ({
+  useOrg: () => ({ orgId: 1, country: orgState.country, signalTerms: orgState.signalTerms }),
+}))
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
@@ -14,6 +17,8 @@ import BacklogPage from '../../src/app/(app)/backlog/page'
 
 afterEach(cleanup)
 beforeEach(() => {
+  orgState.country = 'BE'
+  orgState.signalTerms = []
   toastError.mockClear()
   toastSuccess.mockClear()
   notifyMock.mockClear()
@@ -146,5 +151,47 @@ describe('BacklogPage', () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalled())
     const call = (global.fetch as any).mock.calls.find((c: any[]) => String(c[0]).includes('/api/backlog/import'))
     expect(JSON.parse(call[1].body)).toEqual({ orgId: 1, dids: ['did:plc:22e257wwxrbho4emycurotpi'] })
+  })
+
+  it('scores with the org country profile: Italian signal sorts first with an IT badge', async () => {
+    orgState.country = 'IT'
+    mockFetch([
+      { subjectDid: 'did:plc:none', note: null, handle: 'none.bsky.social', displayName: 'None', description: 'cat pics', verifiers: [] },
+      { subjectDid: 'did:plc:roma', note: null, handle: 'roma.bsky.social', displayName: 'Roma', description: '🇮🇹 Roma', verifiers: [] },
+    ])
+    render(<BacklogPage />)
+    await waitFor(() => expect(screen.getByText('roma.bsky.social', { exact: false })).toBeTruthy())
+    const handles = screen.getAllByText(/@\S+/).map((n) => n.textContent)
+    expect(handles).toEqual(['@roma.bsky.social', '@none.bsky.social'])
+    expect(screen.getByText(/IT 5/)).toBeTruthy()
+    expect(screen.getByText(/strong Italian signals/)).toBeTruthy()
+  })
+
+  it('shows no score badge and no strong-signals segment when the org has no country', async () => {
+    orgState.country = null
+    mockFetch([
+      { subjectDid: 'did:plc:a', note: null, handle: 'a.be', displayName: 'A', description: '🇧🇪 Gent', verifiers: [] },
+    ])
+    render(<BacklogPage />)
+    await waitFor(() => expect(screen.getByText('a.be', { exact: false })).toBeTruthy())
+    expect(screen.queryByText(/BE \d/)).toBeNull()
+    expect(screen.queryByText(/strong .* signals/)).toBeNull()
+    expect(screen.getByText(/1 pending/)).toBeTruthy()
+  })
+
+  it('ranks by the org signal words alone with a Match badge', async () => {
+    orgState.country = null
+    orgState.signalTerms = ['journalist']
+    mockFetch([
+      { subjectDid: 'did:plc:none', note: null, handle: 'none.bsky.social', displayName: 'None', description: 'cat pics', verifiers: [] },
+      { subjectDid: 'did:plc:j', note: null, handle: 'j.bsky.social', displayName: 'J', description: 'Investigative journalist', verifiers: [] },
+    ])
+    render(<BacklogPage />)
+    await waitFor(() => expect(screen.getByText('j.bsky.social', { exact: false })).toBeTruthy())
+    const handles = screen.getAllByText(/@\S+/).map((n) => n.textContent)
+    expect(handles).toEqual(['@j.bsky.social', '@none.bsky.social'])
+    expect(screen.getByText(/Match 2 · journalist/)).toBeTruthy()
+    expect(screen.getAllByTitle('matching evidence score')).toHaveLength(2)
+    expect(screen.getByText(/strong matching signals/)).toBeTruthy()
   })
 })

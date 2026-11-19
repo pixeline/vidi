@@ -3,7 +3,168 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { SettingsView } from '../../src/app/(app)/settings/page'
 
 const toastError = vi.fn()
-vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }))
+const toastSuccess = vi.fn()
+vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) } }))
+
+describe('SettingsView ranking signals', () => {
+  afterEach(() => {
+    cleanup()
+    toastError.mockClear()
+    toastSuccess.mockClear()
+  })
+
+  const okFetch = () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) } as Response))
+    global.fetch = fetchMock
+    return fetchMock
+  }
+
+  it('shows the Ranking signals card to an owner', () => {
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} />)
+    expect(screen.getByText('Ranking signals')).toBeTruthy()
+    expect(screen.getByText(/Pick a country, add your own signal words, or both/)).toBeTruthy()
+  })
+
+  it('lets an owner pick any country, curated ones grouped first', async () => {
+    const fetchMock = okFetch()
+    const onRankingSaved = vi.fn()
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} country="BE" onRankingSaved={onRankingSaved} />)
+    const select = screen.getByLabelText('Country (optional)') as HTMLSelectElement
+    expect(select.tagName).toBe('SELECT')
+    expect(select.options[0].textContent).toBe('None')
+    const groups = Array.from(select.querySelectorAll('optgroup'))
+    expect(groups.map((g) => g.label)).toEqual(['With local signals', 'Other countries'])
+    expect(Array.from(groups[0].querySelectorAll('option')).map((o) => o.textContent)).toEqual([
+      'Belgium (BE)',
+      'France (FR)',
+      'Italy (IT)',
+      'Netherlands (NL)',
+      'Norway (NO)',
+      'Spain (ES)',
+    ])
+    const others = Array.from(groups[1].querySelectorAll('option')).map((o) => o.textContent)
+    expect(others).toContain('Portugal (PT)')
+    expect(others).not.toContain('Belgium (BE)')
+    expect(others).toHaveLength(249 - 6)
+    expect(select.value).toBe('BE')
+    fireEvent.change(select, { target: { value: 'PT' } })
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/vidi/api/org/settings',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ orgId: 1, country: 'PT' }) }),
+      ),
+    )
+    await waitFor(() => expect(onRankingSaved).toHaveBeenCalled())
+  })
+
+  it('prefills the signal words one per line and saves them', async () => {
+    const fetchMock = okFetch()
+    const onRankingSaved = vi.fn()
+    render(
+      <SettingsView
+        role="owner"
+        orgId={1}
+        seeds={[]}
+        accountsCount={0}
+        signalTerms={['journalist', 'lemonde.fr']}
+        onRankingSaved={onRankingSaved}
+      />,
+    )
+    const textarea = screen.getByLabelText('Your signal words') as HTMLTextAreaElement
+    expect(textarea.tagName).toBe('TEXTAREA')
+    expect(textarea.value).toBe('journalist\nlemonde.fr')
+    expect(screen.getByText(/match handles on that domain \(\+3\)/)).toBeTruthy()
+    fireEvent.change(textarea, { target: { value: 'journalist\nreporter, editor' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save signal words' }))
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/vidi/api/org/settings',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ orgId: 1, signalTerms: 'journalist\nreporter, editor' }),
+        }),
+      ),
+    )
+    await waitFor(() => expect(onRankingSaved).toHaveBeenCalled())
+    expect(toastSuccess).toHaveBeenCalled()
+  })
+
+  it('shows an error toast when saving signal words fails', async () => {
+    global.fetch = vi.fn(() => Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'term_too_long' }) } as Response))
+    const onRankingSaved = vi.fn()
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} onRankingSaved={onRankingSaved} />)
+    fireEvent.change(screen.getByLabelText('Your signal words'), { target: { value: 'x'.repeat(61) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save signal words' }))
+    await waitFor(() => expect(toastError).toHaveBeenCalled())
+    expect(onRankingSaved).not.toHaveBeenCalled()
+  })
+
+  it('hides the ranking controls from a helper', () => {
+    render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} country="BE" signalTerms={['journalist']} />)
+    expect(screen.queryByText('Ranking signals')).toBeNull()
+    expect(screen.queryByLabelText('Country (optional)')).toBeNull()
+    expect(screen.queryByLabelText('Your signal words')).toBeNull()
+  })
+
+  it('uses topic-neutral crawl keyword placeholder copy', () => {
+    render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} />)
+    expect(screen.getByPlaceholderText('Places, topics, institutions, hashtags…')).toBeTruthy()
+  })
+})
+
+describe('SettingsView disconnect', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('lets an owner disconnect Vidi after confirming', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) } as Response))
+    global.fetch = fetchMock
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const onDisconnected = vi.fn()
+    render(
+      <SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" onDisconnected={onDisconnected} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect Vidi from @belgium-atmosphe.re' }))
+    expect(confirm).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/vidi/api/org/disconnect',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ orgId: 1 }) }),
+      ),
+    )
+    await waitFor(() => expect(onDisconnected).toHaveBeenCalled())
+    expect(toastSuccess).toHaveBeenCalled()
+  })
+
+  it('does nothing when the confirm is cancelled', () => {
+    const fetchMock = vi.fn()
+    global.fetch = fetchMock as any
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" />)
+    fireEvent.click(screen.getByRole('button', { name: /disconnect vidi from/i }))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('hides the disconnect card when the org is already disconnected', () => {
+    render(
+      <SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" orgStatus="disconnected" />,
+    )
+    expect(screen.queryByRole('button', { name: /disconnect vidi/i })).toBeNull()
+    expect(screen.queryByText('Disconnect Vidi')).toBeNull()
+  })
+
+  it('shows the disconnect card to the owner of an active org', () => {
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" orgStatus="active" />)
+    expect(screen.getByRole('button', { name: 'Disconnect Vidi from @belgium-atmosphe.re' })).toBeTruthy()
+  })
+
+  it('hides the disconnect button from a helper', () => {
+    render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" />)
+    expect(screen.queryByRole('button', { name: /disconnect vidi/i })).toBeNull()
+  })
+})
 
 describe('SettingsView', () => {
   beforeEach(() => {

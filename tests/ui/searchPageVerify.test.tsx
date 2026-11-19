@@ -29,7 +29,7 @@ beforeEach(() => {
   toastSuccess.mockClear()
 })
 
-function mockFetchSequence(verifyOk: boolean) {
+function mockFetchSequence(verifyOk: boolean, verifyBody: unknown = {}, verifyStatus = verifyOk ? 200 : 500) {
   global.fetch = vi.fn((url: string) => {
     if (String(url).includes('/trusted-verifiers')) {
       return Promise.resolve({ json: async () => ({ verifiers: [] }) }) as any
@@ -41,7 +41,7 @@ function mockFetchSequence(verifyOk: boolean) {
       }) as any
     }
     if (String(url).includes('/api/verify')) {
-      return Promise.resolve({ ok: verifyOk, json: async () => ({}) }) as any
+      return Promise.resolve({ ok: verifyOk, status: verifyStatus, json: async () => verifyBody }) as any
     }
     return Promise.resolve({ ok: true, json: async () => ({}) }) as any
   }) as any
@@ -74,5 +74,19 @@ describe('SearchPage verify()', () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1))
     expect(notifyVerifiedCountChanged).not.toHaveBeenCalled()
+  })
+
+  it('explains an org_inactive 403 as a disconnected org', async () => {
+    mockFetchSequence(false, { error: 'org_inactive' }, 403)
+    render(<SearchPage />)
+    await runSearchAndSelectOne()
+
+    fireEvent.click(screen.getByRole('button', { name: /verify selected/i }))
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'This org has disconnected Vidi. The owner can turn it back on with Reconnect.',
+      ),
+    )
   })
 })

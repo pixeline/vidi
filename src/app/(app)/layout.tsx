@@ -14,6 +14,7 @@ const BASE_NAV_LINKS = [
   { href: '/search', label: 'Search' },
   { href: '/backlog', label: 'Backlog' },
   { href: '/members', label: 'Members' },
+  { href: '/activity', label: 'Activity' },
 ]
 
 function ActorIdentity({ handle, avatar }: { handle: string | null; avatar: string | null }) {
@@ -35,7 +36,7 @@ function ActorIdentity({ handle, avatar }: { handle: string | null; avatar: stri
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { orgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, refresh } = useOrg()
+  const { orgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, orgs, orgStatus, ownOrgStatus, selectOrg, refresh } = useOrg()
   // Settings (crawl keywords) is open to any active member — owner or helper —
   // not just the owner. Hidden for non-members (no org context to manage).
   const navLinks = role ? [...BASE_NAV_LINKS, { href: '/settings', label: 'Settings' }] : BASE_NAV_LINKS
@@ -79,6 +80,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const orgResolved = !loading && authenticated && orgId == null
+  // An eligible account onboards when it has no org yet, and reconnects when
+  // its own org was disconnected (its owner membership survives disconnect).
+  const showOnboard =
+    canOnboard && ownOrgStatus !== 'active' && (orgId == null || ownOrgStatus === 'disconnected')
+  const reconnect = ownOrgStatus === 'disconnected'
+  // The selected org's owner sees Reconnect instead of the paused banner.
+  const showPausedBanner = orgId != null && orgStatus != null && orgStatus !== 'active' && !(reconnect && role === 'owner')
 
   return (
     <div className="flex flex-1 flex-col">
@@ -89,14 +97,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <VidiMark className="size-6 shrink-0" />
               <span className="text-lg font-semibold tracking-tight">Vidi</span>
             </Link>
-            {orgHandle && (
+            {orgs && orgs.length > 1 ? (
               <span className="text-sm text-muted-foreground">
                 <span className="mx-0.5" aria-hidden>
                   /
                 </span>
-                <span className="font-medium text-foreground">{orgHandle}</span>
+                <select
+                  aria-label="Organization"
+                  value={orgId ?? ''}
+                  onChange={(e) => selectOrg(Number(e.target.value))}
+                  className="rounded-md border bg-background px-2 py-1 text-sm font-medium text-foreground"
+                >
+                  {orgs.map((o) => (
+                    <option key={o.orgId} value={o.orgId}>
+                      {o.handle}
+                    </option>
+                  ))}
+                </select>
                 {verifiedCount != null && ` (${verifiedCount} verified)`}
               </span>
+            ) : (
+              orgHandle && (
+                <span className="text-sm text-muted-foreground">
+                  <span className="mx-0.5" aria-hidden>
+                    /
+                  </span>
+                  <span className="font-medium text-foreground">{orgHandle}</span>
+                  {verifiedCount != null && ` (${verifiedCount} verified)`}
+                </span>
+              )
             )}
           </div>
           <nav className="flex items-center gap-4">
@@ -123,9 +152,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        {orgResolved && isAllowlisted && <OnboardOrg onOnboarded={refresh} />}
-        {orgResolved && !isAllowlisted && (
+      <main key={orgId ?? 'none'} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        {showOnboard && <OnboardOrg onOnboarded={refresh} reconnect={reconnect} accountHandle={handle} />}
+        {showPausedBanner && (
+          <Card className="mb-6 border-destructive/30 bg-destructive/5">
+            <CardHeader>
+              <CardDescription>
+                This org has disconnected Vidi. Verifying is paused until the owner reconnects.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+        {orgResolved && !canOnboard && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>No organization access yet</CardTitle>

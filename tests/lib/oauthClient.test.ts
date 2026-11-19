@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { isLoopbackBase } from '../../src/lib/atproto/oauthClient'
+import { isLoopbackBase, ORG_SCOPE, MEMBER_SCOPE, hasVerificationScope } from '../../src/lib/atproto/oauthClient'
 
 const TEST_JWK = {
   kty: 'EC',
@@ -14,7 +14,7 @@ const TEST_JWK = {
 
 let GET: any
 beforeAll(async () => {
-  process.env.VIDI_PUBLIC_URL = 'https://belgium-atmosphe.re/vidi'
+  process.env.VIDI_PUBLIC_URL = 'https://vidi.example.org/vidi'
   process.env.VIDI_OAUTH_PRIVATE_JWK = JSON.stringify(TEST_JWK)
   ;({ GET } = await import('../../src/app/client-metadata.json/route'))
 })
@@ -22,9 +22,9 @@ beforeAll(async () => {
 describe('client-metadata', () => {
   it('advertises the correct client_id and scope', async () => {
     const body = await (await GET()).json()
-    expect(body.client_id).toBe('https://belgium-atmosphe.re/vidi/client-metadata.json')
-    expect(body.redirect_uris).toContain('https://belgium-atmosphe.re/vidi/api/auth/callback')
-    expect(body.scope).toBe('atproto transition:generic')
+    expect(body.client_id).toBe('https://vidi.example.org/vidi/client-metadata.json')
+    expect(body.redirect_uris).toContain('https://vidi.example.org/vidi/api/auth/callback')
+    expect(body.scope).toBe(ORG_SCOPE)
     expect(body.dpop_bound_access_tokens).toBe(true)
   })
 
@@ -32,8 +32,15 @@ describe('client-metadata', () => {
     const body = await (await GET()).json()
     expect(body.token_endpoint_auth_method).toBe('private_key_jwt')
     expect(body.token_endpoint_auth_signing_alg).toBe('ES256')
-    expect(body.jwks_uri).toBe('https://belgium-atmosphe.re/vidi/jwks.json')
+    expect(body.jwks_uri).toBe('https://vidi.example.org/vidi/jwks.json')
     expect(body.jwks).toBeUndefined()
+  })
+})
+
+describe('client-metadata policy', () => {
+  it('links the public data page as policy_uri', async () => {
+    const body = await (await GET()).json()
+    expect(body.policy_uri).toBe('https://vidi.example.org/vidi/about')
   })
 })
 
@@ -51,7 +58,7 @@ describe('isLoopbackBase', () => {
   })
 
   it('is false for a real https host', () => {
-    expect(isLoopbackBase('https://belgium-atmosphe.re/vidi')).toBe(false)
+    expect(isLoopbackBase('https://vidi.example.org/vidi')).toBe(false)
   })
 })
 
@@ -77,6 +84,25 @@ describe('clientMetadata in loopback mode', () => {
     // (per the atproto OAuth spec); scope/redirect_uri are carried as query
     // params on it, NOT as a literal 127.0.0.1 origin.
     expect(metadata.client_id.startsWith('http://localhost')).toBe(true)
-    expect(metadata.scope).toBe('atproto transition:generic')
+    expect(metadata.scope).toBe(ORG_SCOPE)
+  })
+})
+
+describe('scopes', () => {
+  it('exposes the narrow constants', () => {
+    expect(ORG_SCOPE).toBe('atproto repo:app.bsky.graph.verification')
+    expect(MEMBER_SCOPE).toBe('atproto')
+  })
+
+  it('hasVerificationScope accepts the org scope and legacy transition:generic', () => {
+    expect(hasVerificationScope('atproto repo:app.bsky.graph.verification')).toBe(true)
+    expect(hasVerificationScope('atproto repo:app.bsky.graph.verification?action=create&action=delete')).toBe(true)
+    expect(hasVerificationScope('atproto transition:generic')).toBe(true)
+  })
+
+  it('hasVerificationScope rejects scopes that cannot write verification records', () => {
+    expect(hasVerificationScope('atproto')).toBe(false)
+    expect(hasVerificationScope('atproto repo:app.bsky.feed.post')).toBe(false)
+    expect(hasVerificationScope('atproto repo:app.bsky.graph.verification.extra')).toBe(false)
   })
 })

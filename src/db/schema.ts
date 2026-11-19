@@ -41,6 +41,9 @@ export const orgs = pgTable('orgs', {
   scopes: text('scopes'),
   status: text('status').notNull().default('active'),
   onboardedByDid: text('onboarded_by_did'),
+  country: text('country'),
+  // Owner-typed ranking signal words (lowercased, deduped); see lib/signals/customTerms.
+  signalTerms: text('signal_terms').array().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
@@ -83,11 +86,18 @@ export const crawlRuns = pgTable('crawl_runs', {
   stats: jsonb('stats').$type<Record<string, number>>(),
 })
 
-export const crawlSeeds = pgTable('crawl_seeds', {
-  id: serial('id').primaryKey(),
-  keyword: text('keyword').notNull().unique(),
-  enabled: boolean('enabled').notNull().default(true),
-})
+export const crawlSeeds = pgTable(
+  'crawl_seeds',
+  {
+    id: serial('id').primaryKey(),
+    orgId: integer('org_id').notNull(),
+    keyword: text('keyword').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+  },
+  (t) => ({
+    orgKeyword: uniqueIndex('crawl_seeds_org_keyword_uniq').on(t.orgId, t.keyword),
+  })
+)
 
 export const crawlRequests = pgTable('crawl_requests', {
   id: serial('id').primaryKey(),

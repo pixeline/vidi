@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getActor = vi.fn()
-const isAllowlisted = vi.fn()
+const canOnboard = vi.fn()
 const getOrgAgent = vi.fn()
+const getOrgScope = vi.fn()
+const getProfile = vi.fn()
 
 vi.mock('../../src/lib/authz/session', () => ({ getActor: () => getActor() }))
-vi.mock('../../src/lib/allowlist', () => ({ isAllowlisted: (did: string) => isAllowlisted(did) }))
-vi.mock('../../src/lib/atproto/orgAgent', () => ({ getOrgAgent: (did: string) => getOrgAgent(did) }))
+vi.mock('../../src/lib/allowlist', () => ({ canOnboard: (did: string) => canOnboard(did) }))
+vi.mock('../../src/lib/atproto/orgAgent', () => ({
+  getOrgAgent: (did: string) => getOrgAgent(did),
+  getOrgScope: (did: string) => getOrgScope(did),
+}))
+vi.mock('../../src/lib/atproto/publicAgent', () => ({
+  getPublicAppViewAgent: () => ({ getProfile: (a: unknown) => getProfile(a) }),
+}))
 
 const returning = vi.fn()
 const onConflictDoUpdateOrgs = vi.fn(() => ({ returning }))
@@ -32,8 +40,10 @@ import { POST } from '../../src/app/api/org/onboard/route'
 describe('POST /api/org/onboard', () => {
   beforeEach(() => {
     getActor.mockReset()
-    isAllowlisted.mockReset()
+    canOnboard.mockReset()
     getOrgAgent.mockReset()
+    getOrgScope.mockReset()
+    getProfile.mockReset()
     returning.mockReset()
     valuesOrgs.mockClear()
     valuesMembers.mockClear()
@@ -50,16 +60,16 @@ describe('POST /api/org/onboard', () => {
 
   it('returns 403 when not allowlisted', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(false)
+    canOnboard.mockResolvedValue(false)
     const res = await POST()
     expect(res.status).toBe(403)
-    expect((await res.json()).error).toBe('not_allowlisted')
+    expect((await res.json()).error).toBe('not_eligible')
   })
 
   it('returns 400 no_org_session when the org OAuth session cannot be restored', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
-    getOrgAgent.mockRejectedValue(new Error('no session'))
+    canOnboard.mockResolvedValue(true)
+    getOrgScope.mockRejectedValue(new Error('no session'))
     const res = await POST()
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('no_org_session')
@@ -67,27 +77,28 @@ describe('POST /api/org/onboard', () => {
 
   it('upserts org + owner member and returns ok + orgId', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
-    getOrgAgent.mockResolvedValue({
-      getProfile: async ({ actor }: { actor: string }) => ({ data: { handle: 'org.example.com', did: actor } }),
-    })
+    canOnboard.mockResolvedValue(true)
+    getOrgScope.mockResolvedValue('atproto repo:app.bsky.graph.verification')
+    getProfile.mockResolvedValue({ data: { handle: 'org.example.com', did: 'did:plc:org' } })
     returning.mockResolvedValue([{ id: 42 }])
 
     const res = await POST()
     const body = await res.json()
 
     expect(body).toEqual({ ok: true, orgId: 42 })
+    expect(getProfile).toHaveBeenCalledWith({ actor: 'did:plc:org' })
+    expect(getOrgAgent).not.toHaveBeenCalled()
     expect(valuesOrgs).toHaveBeenCalledWith(
       expect.objectContaining({
         did: 'did:plc:org',
         handle: 'org.example.com',
         status: 'active',
-        scopes: 'atproto transition:generic',
+        scopes: 'atproto repo:app.bsky.graph.verification',
         onboardedByDid: 'did:plc:org',
       })
     )
     expect(onConflictDoUpdateOrgs).toHaveBeenCalledWith(
-      expect.objectContaining({ target: 'orgs.did', set: { handle: 'org.example.com', status: 'active' } })
+      expect.objectContaining({ target: 'orgs.did', set: { handle: 'org.example.com', status: 'active', scopes: 'atproto repo:app.bsky.graph.verification' } })
     )
     expect(valuesMembers).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: 42, memberDid: 'did:plc:org', handle: 'org.example.com', role: 'owner' })
@@ -98,5 +109,16 @@ describe('POST /api/org/onboard', () => {
         set: { role: 'owner', status: 'active' },
       })
     )
+  })
+
+  it('returns 400 missing_verification_scope when the session lacks the scope, without inserting', async () => {
+    getActor.mockResolvedValue({ did: 'did:plc:org' })
+    canOnboard.mockResolvedValue(true)
+    getOrgScope.mockResolvedValue('atproto')
+    const res = await POST()
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('missing_verification_scope')
+    expect(valuesOrgs).not.toHaveBeenCalled()
+    expect(valuesMembers).not.toHaveBeenCalled()
   })
 })

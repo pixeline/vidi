@@ -82,3 +82,43 @@ On every push to the `main` branch, the GitHub Actions workflow automatically:
    - Pulls the latest Docker image
    - Runs database migrations using `npx tsx src/db/migrate.ts`
    - Starts the application with `docker compose up -d`
+
+## Hosting several verifiers
+
+Vidi can serve several Trusted Verifier organizations from one deployment. Each
+org has its own members, backlog, keyword seeds and activity log. Crawled public
+profile data is shared. What Vidi stores is described on the public `/about` page.
+
+### Onboarding a verifier
+
+1. The verifier must be on the allowlist or in `trusted_verifiers`.
+2. They sign in with the verifier account's handle and tick "I'm signing in as the
+   verifier account".
+3. They click Onboard. Vidi creates the org and makes them its owner.
+4. The owner picks ranking signals in Settings and invites helpers.
+
+### Ranking signals
+
+The To Be Verified list can be ranked by evidence that an account belongs to the
+verifier's community. Each org owner sets this in Settings under "Ranking
+signals": a country, their own signal words, or both. Scores add up. With
+neither, the list keeps the order accounts were added.
+
+- **Curated countries** (Belgium, France, Italy, the Netherlands, Norway, Spain)
+  have local lists of institutions, places and other words in
+  `src/lib/signals/profiles.ts`, keyed by ISO 3166 alpha-2 code. To add or
+  improve one, open a PR; native verifiers are best placed to review them.
+- **Every other country** gets a generic fallback: its flag emoji, its national
+  handle domain (none for ccTLDs used mostly generically, like `.io` or `.tv`),
+  and its name in the main European languages.
+- **Thematic verifiers** (journalists, scientists, public institutions…) type
+  their own signal words. Words and phrases are matched in names and bios (+2
+  each). Entries with a dot, like `lemonde.fr`, match handles on that domain
+  (+3).
+
+### Moving to another domain
+
+The OAuth `client_id` is derived from `VIDI_PUBLIC_URL`. If you change the URL, the
+`client_id` changes too, so every existing session stops working and everyone must
+sign in again. Org owners keep their data but must sign in with the verifier
+account again so Vidi gets a new token.

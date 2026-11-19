@@ -149,7 +149,7 @@ describe('MembersPage loading fallback', () => {
       'fetch',
       vi.fn(async () => ({
         status: 200,
-        json: async () => ({ orgId: null, role: null, isAllowlisted: false, handle: null }),
+        json: async () => ({ orgId: null, role: null, canOnboard: false, handle: null }),
       })) as any
     )
 
@@ -165,7 +165,7 @@ describe('MembersPage loading fallback', () => {
       'fetch',
       vi.fn(async (url: string) => {
         if (String(url).includes('/org/context')) {
-          return { status: 200, json: async () => ({ orgId: 1, role: 'owner', isAllowlisted: true, handle: 'x' }) }
+          return { status: 200, json: async () => ({ orgId: 1, role: 'owner', canOnboard: true, handle: 'x' }) }
         }
         if (String(url).includes('/api/members')) {
           return { ok: false, json: async () => ({}) }

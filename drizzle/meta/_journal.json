@@ -29,6 +29,27 @@
       "when": 1783610892130,
       "tag": "0003_optimal_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795048188323,
+      "tag": "0004_exotic_roulette",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795048433034,
+      "tag": "0005_aromatic_unicorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795051560357,
+      "tag": "0006_slim_princess_powerful",
+      "breakpoints": true
     }
   ]
 }
