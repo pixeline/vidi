@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-let seedRows: Array<{ id: number; keyword: string; enabled: boolean }> = []
+let seedRows: Array<{ id?: number; orgId?: number; keyword: string; enabled: boolean }> = []
 
 vi.mock('../../src/db/client', () => ({
   db: {
@@ -75,6 +75,19 @@ describe('runKeywordSeed', () => {
     expect(searchActorsTypeahead).toHaveBeenNthCalledWith(1, { q: 'brussels', limit: 100 })
     expect(searchActorsTypeahead).toHaveBeenNthCalledWith(2, { q: 'belgium', limit: 100 })
     expect(dids.sort()).toEqual(['did:plc:a', 'did:plc:b', 'did:plc:c'])
+  })
+
+  it('queries a keyword shared by two orgs once', async () => {
+    seedRows = [
+      { orgId: 1, keyword: 'roma', enabled: true },
+      { orgId: 2, keyword: 'roma', enabled: true },
+    ]
+    searchActorsTypeahead.mockResolvedValue({ data: { actors: [{ did: 'did:plc:a' }] } })
+
+    await runKeywordSeed({} as any)
+
+    expect(searchActorsTypeahead).toHaveBeenCalledTimes(1)
+    expect(searchActorsTypeahead).toHaveBeenCalledWith({ q: 'roma', limit: 100 })
   })
 
   it('returns an empty array when there are no enabled seeds', async () => {

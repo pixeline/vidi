@@ -1,5 +1,6 @@
 import { db } from '../src/db/client'
-import { crawlSeeds } from '../src/db/schema'
+import { asc } from 'drizzle-orm'
+import { crawlSeeds, orgs } from '../src/db/schema'
 import { addToAllowlist } from '../src/lib/allowlist'
 import { validateEnv } from '../src/lib/env'
 import { isMain } from '../src/lib/isMain'
@@ -12,8 +13,18 @@ export async function seed() {
   for (const did of parseSeeds(process.env.VIDI_SEED_ALLOWLIST ?? '')) {
     await addToAllowlist(did, '', 'seed')
   }
-  for (const kw of parseSeeds(process.env.VIDI_SEED_KEYWORDS ?? '')) {
-    await db.insert(crawlSeeds).values({ keyword: kw, enabled: true }).onConflictDoNothing()
+  const keywords = parseSeeds(process.env.VIDI_SEED_KEYWORDS ?? '')
+  if (keywords.length) {
+    // Keywords are per org now; attach env seeds to the first org. Before any
+    // org has onboarded there is nothing to attach to, so skip.
+    const [org] = await db.select({ id: orgs.id }).from(orgs).orderBy(asc(orgs.id)).limit(1)
+    if (!org) {
+      console.warn('seed: VIDI_SEED_KEYWORDS ignored, no org exists yet')
+    } else {
+      for (const kw of keywords) {
+        await db.insert(crawlSeeds).values({ orgId: org.id, keyword: kw, enabled: true }).onConflictDoNothing()
+      }
+    }
   }
 }
 

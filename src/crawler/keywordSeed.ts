@@ -22,16 +22,18 @@ export async function runKeywordSeed(agent: AtpAgent): Promise<string[]> {
   const typeaheadAgent = new AtpAgent({ service: TYPEAHEAD_URL() })
   const seeds = await db.select().from(crawlSeeds).where(eq(crawlSeeds.enabled, true))
   const dids = new Set<string>()
-  for (const s of seeds) {
+  // Several orgs may share a keyword; query each distinct one once.
+  const keywords = new Set(seeds.map((s) => s.keyword))
+  for (const keyword of keywords) {
     try {
-      const { data } = await typeaheadAgent.app.bsky.actor.searchActorsTypeahead({ q: s.keyword, limit: 100 })
+      const { data } = await typeaheadAgent.app.bsky.actor.searchActorsTypeahead({ q: keyword, limit: 100 })
       for (const a of data.actors) dids.add(a.did)
     } catch (err) {
       // A single malformed actor in the response (e.g. an invalid/unverified
       // handle) fails strict lexicon validation for the WHOLE query. Isolate
       // per-keyword so one bad result doesn't lose every other keyword's
       // discovery for this run.
-      console.error(`runKeywordSeed: keyword "${s.keyword}" failed`, err)
+      console.error(`runKeywordSeed: keyword "${keyword}" failed`, err)
     }
   }
   return [...dids]
