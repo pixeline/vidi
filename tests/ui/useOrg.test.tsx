@@ -13,7 +13,7 @@ describe('useOrg', () => {
   it('exposes verifiedCount from the org/context response', async () => {
     ;(global.fetch as any).mockResolvedValue({
       status: 200,
-      json: async () => ({ orgId: 1, role: 'owner', isAllowlisted: true, handle: 'x', verifiedCount: 7 }),
+      json: async () => ({ orgId: 1, role: 'owner', canOnboard: true, handle: 'x', verifiedCount: 7 }),
     })
     const { result } = renderHook(() => useOrg())
     await waitFor(() => expect(result.current.verifiedCount).toBe(7))
@@ -25,7 +25,7 @@ describe('useOrg', () => {
       call++
       return {
         status: 200,
-        json: async () => ({ orgId: 1, role: 'owner', isAllowlisted: true, handle: 'x', verifiedCount: call }),
+        json: async () => ({ orgId: 1, role: 'owner', canOnboard: true, handle: 'x', verifiedCount: call }),
       }
     })
     const { result } = renderHook(() => useOrg())

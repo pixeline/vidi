@@ -16,7 +16,7 @@ describe('AppLayout', () => {
     useOrgMock.mockReturnValue({
       orgId: 1,
       role: 'owner',
-      isAllowlisted: true,
+      canOnboard: true,
       handle: 'org.example.com',
       orgHandle: 'belgium-atmosphe.re',
       authenticated: true,
@@ -33,7 +33,7 @@ describe('AppLayout', () => {
     useOrgMock.mockReturnValue({
       orgId: 1,
       role: 'owner',
-      isAllowlisted: true,
+      canOnboard: true,
       handle: 'org.example.com',
       orgHandle: 'belgium-atmosphe.re',
       authenticated: true,
@@ -50,7 +50,7 @@ describe('AppLayout', () => {
     useOrgMock.mockReturnValue({
       orgId: null,
       role: null,
-      isAllowlisted: false,
+      canOnboard: false,
       handle: null,
       authenticated: false,
       loading: true,
@@ -63,7 +63,7 @@ describe('AppLayout', () => {
 
   it('does not render the app shell or children while auth is still resolving', () => {
     useOrgMock.mockReturnValue({
-      orgId: null, role: null, isAllowlisted: false, handle: null,
+      orgId: null, role: null, canOnboard: false, handle: null,
       authenticated: null, loading: true, verifiedCount: null, refresh: vi.fn(),
     })
     render(<AppLayout><div>protected content</div></AppLayout>)
@@ -74,7 +74,7 @@ describe('AppLayout', () => {
 
   it('redirects to the login page and hides the shell when the user is not authenticated', async () => {
     useOrgMock.mockReturnValue({
-      orgId: null, role: null, isAllowlisted: false, handle: null,
+      orgId: null, role: null, canOnboard: false, handle: null,
       authenticated: false, loading: false, verifiedCount: null, refresh: vi.fn(),
     })
     render(<AppLayout><div>protected content</div></AppLayout>)
@@ -85,7 +85,7 @@ describe('AppLayout', () => {
 
   it('renders children and never redirects when authenticated', () => {
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'helper', isAllowlisted: true, handle: 'org.example.com',
+      orgId: 1, role: 'helper', canOnboard: true, handle: 'org.example.com',
       avatar: null, authenticated: true, loading: false, verifiedCount: 0, refresh: vi.fn(),
     })
     render(<AppLayout><div>protected content</div></AppLayout>)
@@ -95,7 +95,7 @@ describe('AppLayout', () => {
 
   it('renders the logged-in avatar image when one is available', () => {
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'owner', isAllowlisted: true, handle: 'org.example.com',
+      orgId: 1, role: 'owner', canOnboard: true, handle: 'org.example.com',
       avatar: 'https://av.example/pic.jpg', authenticated: true, loading: false, verifiedCount: 0, refresh: vi.fn(),
     })
     render(<AppLayout>{null}</AppLayout>)
@@ -104,7 +104,7 @@ describe('AppLayout', () => {
 
   it('falls back to the handle initial when no avatar is set', () => {
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'owner', isAllowlisted: true, handle: 'org.example.com',
+      orgId: 1, role: 'owner', canOnboard: true, handle: 'org.example.com',
       avatar: null, authenticated: true, loading: false, verifiedCount: 0, refresh: vi.fn(),
     })
     render(<AppLayout>{null}</AppLayout>)
@@ -114,7 +114,7 @@ describe('AppLayout', () => {
 
   it('shows the Settings link for an active member (helper), not just owners', () => {
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'helper', isAllowlisted: true, handle: 'pixeline.be',
+      orgId: 1, role: 'helper', canOnboard: true, handle: 'pixeline.be',
       avatar: null, authenticated: true, loading: false, verifiedCount: 0, refresh: vi.fn(),
     })
     render(<AppLayout>{null}</AppLayout>)
@@ -123,7 +123,7 @@ describe('AppLayout', () => {
 
   it('hides the Settings link for a non-member (no org role)', () => {
     useOrgMock.mockReturnValue({
-      orgId: null, role: null, isAllowlisted: true, handle: null,
+      orgId: null, role: null, canOnboard: true, handle: null,
       avatar: null, authenticated: true, loading: false, verifiedCount: null, refresh: vi.fn(),
     })
     render(<AppLayout>{null}</AppLayout>)
@@ -133,7 +133,7 @@ describe('AppLayout', () => {
   it('renders an Organization switcher with several orgs and calls selectOrg on change', () => {
     const selectOrg = vi.fn()
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'owner', isAllowlisted: true, handle: 'me', orgHandle: 'be.example',
+      orgId: 1, role: 'owner', canOnboard: true, handle: 'me', orgHandle: 'be.example',
       orgs: [
         { orgId: 1, handle: 'be.example', role: 'owner' },
         { orgId: 2, handle: 'it.example', role: 'helper' },
@@ -149,7 +149,7 @@ describe('AppLayout', () => {
 
   it('renders no switcher with a single org', () => {
     useOrgMock.mockReturnValue({
-      orgId: 1, role: 'owner', isAllowlisted: true, handle: 'me', orgHandle: 'be.example',
+      orgId: 1, role: 'owner', canOnboard: true, handle: 'me', orgHandle: 'be.example',
       orgs: [{ orgId: 1, handle: 'be.example', role: 'owner' }],
       selectOrg: vi.fn(), avatar: null, authenticated: true, loading: false, verifiedCount: 3, refresh: vi.fn(),
     })

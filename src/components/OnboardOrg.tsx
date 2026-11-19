@@ -14,8 +14,8 @@ export function OnboardOrg({ onOnboarded }: { onOnboarded: () => void }) {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
         const message =
-          body?.error === 'not_allowlisted'
-            ? 'This account is not allowlisted to onboard an org.'
+          body?.error === 'not_eligible'
+            ? 'Only accounts on the Trusted Verifier list can set up an org. Ask the Vidi operator to add you.'
             : body?.error === 'no_org_session'
               ? 'Sign in as the org account before onboarding.'
               : body?.error === 'missing_verification_scope'

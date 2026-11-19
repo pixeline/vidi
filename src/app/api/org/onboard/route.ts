@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '../../../../db/client'
 import { orgs, members } from '../../../../db/schema'
 import { getActor } from '../../../../lib/authz/session'
-import { isAllowlisted } from '../../../../lib/allowlist'
+import { canOnboard } from '../../../../lib/allowlist'
 import { getOrgScope } from '../../../../lib/atproto/orgAgent'
 import { getPublicAppViewAgent } from '../../../../lib/atproto/publicAgent'
 import { hasVerificationScope } from '../../../../lib/atproto/oauthClient'
@@ -10,8 +10,8 @@ import { hasVerificationScope } from '../../../../lib/atproto/oauthClient'
 export async function POST() {
   const actor = await getActor()
   if (!actor) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
-  if (!(await isAllowlisted(actor.did))) {
-    return NextResponse.json({ error: 'not_allowlisted' }, { status: 403 })
+  if (!(await canOnboard(actor.did))) {
+    return NextResponse.json({ error: 'not_eligible' }, { status: 403 })
   }
 
   // Prove we hold the org writer session: the owner must have logged in AS

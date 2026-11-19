@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getActor = vi.fn()
 const sessionHolder = vi.hoisted(() => ({ activeOrgId: undefined as number | undefined }))
-const isAllowlisted = vi.fn()
+const canOnboard = vi.fn()
 const countOrgVerifications = vi.fn()
 const getActorAvatar = vi.fn()
 
@@ -10,7 +10,7 @@ vi.mock('../../src/lib/authz/session', () => ({
   getActor: () => getActor(),
   getSession: async () => ({ activeOrgId: sessionHolder.activeOrgId }),
 }))
-vi.mock('../../src/lib/allowlist', () => ({ isAllowlisted: (did: string) => isAllowlisted(did) }))
+vi.mock('../../src/lib/allowlist', () => ({ canOnboard: (did: string) => canOnboard(did) }))
 vi.mock('../../src/lib/verify/verifiedCount', () => ({ countOrgVerifications: (did: string) => countOrgVerifications(did) }))
 vi.mock('../../src/lib/atproto/profileCache', () => ({ getActorAvatar: (did: string) => getActorAvatar(did) }))
 
@@ -46,7 +46,7 @@ import { GET } from '../../src/app/api/org/context/route'
 describe('GET /api/org/context', () => {
   beforeEach(() => {
     getActor.mockReset()
-    isAllowlisted.mockReset()
+    canOnboard.mockReset()
     countOrgVerifications.mockReset()
     getActorAvatar.mockReset()
     getActorAvatar.mockResolvedValue('https://av.example/pic.jpg')
@@ -63,9 +63,9 @@ describe('GET /api/org/context', () => {
     expect(await res.json()).toEqual({ orgId: null })
   })
 
-  it('returns org handle + isAllowlisted + live verifiedCount for an owner', async () => {
+  it('returns org handle + canOnboard + live verifiedCount for an owner', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     countOrgVerifications.mockResolvedValue(42)
     rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'stale.owner' }]
     rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE' }]
@@ -75,7 +75,7 @@ describe('GET /api/org/context', () => {
     expect(await res.json()).toEqual({
       orgId: 7,
       role: 'owner',
-      isAllowlisted: true,
+      canOnboard: true,
       handle: 'org.example.com',
       orgHandle: 'org.example.com',
       avatar: 'https://av.example/pic.jpg',
@@ -88,7 +88,7 @@ describe('GET /api/org/context', () => {
 
   it('returns the membership handle and live verifiedCount for a helper (scoped to the org, not the role)', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:helper' })
-    isAllowlisted.mockResolvedValue(false)
+    canOnboard.mockResolvedValue(false)
     countOrgVerifications.mockResolvedValue(5)
     rowsHolder.memberRows = [{ orgId: 7, role: 'helper', status: 'active', handle: 'pixeline.be' }]
     rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com' }]
@@ -97,7 +97,7 @@ describe('GET /api/org/context', () => {
     expect(await res.json()).toEqual({
       orgId: 7,
       role: 'helper',
-      isAllowlisted: false,
+      canOnboard: false,
       handle: 'pixeline.be',
       orgHandle: 'org.example.com',
       avatar: 'https://av.example/pic.jpg',
@@ -109,7 +109,7 @@ describe('GET /api/org/context', () => {
 
   it('falls back to the locally-crawled count when the live network read fails', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     countOrgVerifications.mockRejectedValue(new Error('network down'))
     rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'org.example.com' }]
     rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com' }]
@@ -122,14 +122,14 @@ describe('GET /api/org/context', () => {
 
   it('returns null orgId/role/handle/verifiedCount for an actor with no membership', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:nobody' })
-    isAllowlisted.mockResolvedValue(false)
+    canOnboard.mockResolvedValue(false)
     rowsHolder.memberRows = []
 
     const res = await GET()
     expect(await res.json()).toEqual({
       orgId: null,
       role: null,
-      isAllowlisted: false,
+      canOnboard: false,
       handle: null,
       orgHandle: null,
       avatar: 'https://av.example/pic.jpg',
@@ -139,15 +139,15 @@ describe('GET /api/org/context', () => {
     })
   })
 
-  it('surfaces isAllowlisted true for an allowlisted actor with no membership (can self-onboard)', async () => {
+  it('surfaces canOnboard true for an allowlisted actor with no membership (can self-onboard)', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:eligible' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     rowsHolder.memberRows = []
 
     const res = await GET()
     const body = await res.json()
     expect(body.orgId).toBeNull()
-    expect(body.isAllowlisted).toBe(true)
+    expect(body.canOnboard).toBe(true)
   })
 
   describe('several memberships', () => {
@@ -163,7 +163,7 @@ describe('GET /api/org/context', () => {
     }
     beforeEach(() => {
       getActor.mockResolvedValue({ did: 'did:plc:me' })
-      isAllowlisted.mockResolvedValue(false)
+      canOnboard.mockResolvedValue(false)
       countOrgVerifications.mockResolvedValue(1)
     })
 

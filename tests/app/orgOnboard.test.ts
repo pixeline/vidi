@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getActor = vi.fn()
-const isAllowlisted = vi.fn()
+const canOnboard = vi.fn()
 const getOrgAgent = vi.fn()
 const getOrgScope = vi.fn()
 const getProfile = vi.fn()
 
 vi.mock('../../src/lib/authz/session', () => ({ getActor: () => getActor() }))
-vi.mock('../../src/lib/allowlist', () => ({ isAllowlisted: (did: string) => isAllowlisted(did) }))
+vi.mock('../../src/lib/allowlist', () => ({ canOnboard: (did: string) => canOnboard(did) }))
 vi.mock('../../src/lib/atproto/orgAgent', () => ({
   getOrgAgent: (did: string) => getOrgAgent(did),
   getOrgScope: (did: string) => getOrgScope(did),
@@ -40,7 +40,7 @@ import { POST } from '../../src/app/api/org/onboard/route'
 describe('POST /api/org/onboard', () => {
   beforeEach(() => {
     getActor.mockReset()
-    isAllowlisted.mockReset()
+    canOnboard.mockReset()
     getOrgAgent.mockReset()
     getOrgScope.mockReset()
     getProfile.mockReset()
@@ -60,15 +60,15 @@ describe('POST /api/org/onboard', () => {
 
   it('returns 403 when not allowlisted', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(false)
+    canOnboard.mockResolvedValue(false)
     const res = await POST()
     expect(res.status).toBe(403)
-    expect((await res.json()).error).toBe('not_allowlisted')
+    expect((await res.json()).error).toBe('not_eligible')
   })
 
   it('returns 400 no_org_session when the org OAuth session cannot be restored', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     getOrgScope.mockRejectedValue(new Error('no session'))
     const res = await POST()
     expect(res.status).toBe(400)
@@ -77,7 +77,7 @@ describe('POST /api/org/onboard', () => {
 
   it('upserts org + owner member and returns ok + orgId', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     getOrgScope.mockResolvedValue('atproto repo:app.bsky.graph.verification')
     getProfile.mockResolvedValue({ data: { handle: 'org.example.com', did: 'did:plc:org' } })
     returning.mockResolvedValue([{ id: 42 }])
@@ -113,7 +113,7 @@ describe('POST /api/org/onboard', () => {
 
   it('returns 400 missing_verification_scope when the session lacks the scope, without inserting', async () => {
     getActor.mockResolvedValue({ did: 'did:plc:org' })
-    isAllowlisted.mockResolvedValue(true)
+    canOnboard.mockResolvedValue(true)
     getOrgScope.mockResolvedValue('atproto')
     const res = await POST()
     expect(res.status).toBe(400)

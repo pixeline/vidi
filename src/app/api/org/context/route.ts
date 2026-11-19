@@ -3,7 +3,7 @@ import { count, eq, inArray } from 'drizzle-orm'
 import { db } from '../../../../db/client'
 import { accountVerifications, members, orgs } from '../../../../db/schema'
 import { getActor, getSession } from '../../../../lib/authz/session'
-import { isAllowlisted } from '../../../../lib/allowlist'
+import { canOnboard } from '../../../../lib/allowlist'
 import { countOrgVerifications } from '../../../../lib/verify/verifiedCount'
 import { getActorAvatar } from '../../../../lib/atproto/profileCache'
 
@@ -27,7 +27,7 @@ export async function GET() {
   const session = await getSession()
   const active = activeRows.find((r) => r.orgId === session.activeOrgId) ?? activeRows[0]
 
-  const allowlisted = await isAllowlisted(actor.did)
+  const eligible = await canOnboard(actor.did)
   // The logged-in profile's avatar (cached); null falls back to initials/icon.
   const avatar = await getActorAvatar(actor.did)
 
@@ -65,7 +65,7 @@ export async function GET() {
   return NextResponse.json({
     orgId: active?.orgId ?? null,
     role: active?.role ?? null,
-    isAllowlisted: allowlisted,
+    canOnboard: eligible,
     handle,
     orgHandle,
     avatar,

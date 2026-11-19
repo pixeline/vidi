@@ -8,7 +8,7 @@ export type OrgSummary = { orgId: number; handle: string; role: 'owner' | 'helpe
 export function useOrg() {
   const [orgId, setOrgId] = useState<number | null>(null)
   const [role, setRole] = useState<string | null>(null)
-  const [isAllowlisted, setIsAllowlisted] = useState<boolean>(false)
+  const [canOnboard, setCanOnboard] = useState<boolean>(false)
   const [handle, setHandle] = useState<string | null>(null)
   const [orgHandle, setOrgHandle] = useState<string | null>(null)
   const [avatar, setAvatar] = useState<string | null>(null)
@@ -26,7 +26,7 @@ export function useOrg() {
       const d = await res.json()
       setOrgId(d.orgId ?? null)
       setRole(d.role ?? null)
-      setIsAllowlisted(d.isAllowlisted ?? false)
+      setCanOnboard(d.canOnboard ?? false)
       setHandle(d.handle ?? null)
       setOrgHandle(d.orgHandle ?? null)
       setAvatar(d.avatar ?? null)
@@ -37,7 +37,7 @@ export function useOrg() {
       setAuthenticated(false)
       setOrgId(null)
       setRole(null)
-      setIsAllowlisted(false)
+      setCanOnboard(false)
       setHandle(null)
       setOrgHandle(null)
       setAvatar(null)
@@ -70,5 +70,5 @@ export function useOrg() {
   // the new count without a full page reload — see verifiedCountBus.ts.
   useEffect(() => subscribeVerifiedCountChanged(refresh), [refresh])
 
-  return { orgId, setOrgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, orgs, selectOrg, refresh }
+  return { orgId, setOrgId, role, canOnboard, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, orgs, selectOrg, refresh }
 }
