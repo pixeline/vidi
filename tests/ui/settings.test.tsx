@@ -5,6 +5,34 @@ import { SettingsView } from '../../src/app/(app)/settings/page'
 const toastError = vi.fn()
 vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }))
 
+describe('SettingsView country profile', () => {
+  afterEach(cleanup)
+
+  it('lets an owner pick a country profile', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) } as Response))
+    global.fetch = fetchMock
+    const onCountrySaved = vi.fn()
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} country="BE" onCountrySaved={onCountrySaved} />)
+    const select = screen.getByLabelText('Country profile') as HTMLSelectElement
+    expect(select.tagName).toBe('SELECT')
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['None', 'Belgium (BE)', 'Italy (IT)'])
+    expect(select.value).toBe('BE')
+    fireEvent.change(select, { target: { value: 'IT' } })
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/vidi/api/org/settings',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ orgId: 1, country: 'IT' }) }),
+      ),
+    )
+    await waitFor(() => expect(onCountrySaved).toHaveBeenCalled())
+  })
+
+  it('hides the country profile from a helper', () => {
+    render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} country="BE" />)
+    expect(screen.queryByLabelText('Country profile')).toBeNull()
+  })
+})
+
 describe('SettingsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()

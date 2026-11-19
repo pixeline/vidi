@@ -13,6 +13,7 @@ export function useOrg() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [verifiedCount, setVerifiedCount] = useState<number | null>(null)
+  const [country, setCountry] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -27,6 +28,7 @@ export function useOrg() {
       setOrgHandle(d.orgHandle ?? null)
       setAvatar(d.avatar ?? null)
       setVerifiedCount(d.verifiedCount ?? null)
+      setCountry(d.country ?? null)
     } catch {
       setAuthenticated(false)
       setOrgId(null)
@@ -36,6 +38,7 @@ export function useOrg() {
       setOrgHandle(null)
       setAvatar(null)
       setVerifiedCount(null)
+      setCountry(null)
     } finally {
       setLoading(false)
     }
@@ -50,5 +53,5 @@ export function useOrg() {
   // the new count without a full page reload — see verifiedCountBus.ts.
   useEffect(() => subscribeVerifiedCountChanged(refresh), [refresh])
 
-  return { orgId, setOrgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, refresh }
+  return { orgId, setOrgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, refresh }
 }

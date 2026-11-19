@@ -63,7 +63,7 @@ describe('GET /api/org/context', () => {
     isAllowlisted.mockResolvedValue(true)
     countOrgVerifications.mockResolvedValue(42)
     rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'stale.owner' }]
-    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com' }]
+    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE' }]
 
     const res = await GET()
     expect(res.status).toBe(200)
@@ -75,6 +75,7 @@ describe('GET /api/org/context', () => {
       orgHandle: 'org.example.com',
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 42,
+      country: 'BE',
     })
     expect(countOrgVerifications).toHaveBeenCalledWith('did:plc:org')
   })
@@ -95,6 +96,7 @@ describe('GET /api/org/context', () => {
       orgHandle: 'org.example.com',
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 5,
+      country: null,
     })
   })
 
@@ -125,6 +127,7 @@ describe('GET /api/org/context', () => {
       orgHandle: null,
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: null,
+      country: null,
     })
   })
 

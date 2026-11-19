@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
 import { scoreAccount, STRONG_SCORE, type SignalResult } from '@/lib/signals/countryProfile'
-import { PROFILES } from '@/lib/signals/profiles'
+import { profileFor } from '@/lib/signals/profiles'
 import { extractDids } from '@/lib/extractDids'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ type BacklogItem = {
   verifiers?: { did: string; handle: string | null }[]
 }
 
-type Scored = BacklogItem & { be: SignalResult }
+type Scored = BacklogItem & { sig: SignalResult }
 
 // Mirrors /api/verify's default VIDI_BATCH_MAX so bulk verifies never trip the cap.
 const VERIFY_BATCH = 50
@@ -31,7 +31,8 @@ const VERIFY_BATCH = 50
 const BROKEN_HANDLE = 'handle.invalid'
 
 export default function BacklogPage() {
-  const { orgId } = useOrg()
+  const { orgId, country } = useOrg()
+  const profile = profileFor(country)
   const [items, setItems] = useState<BacklogItem[]>([])
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
@@ -47,15 +48,17 @@ export default function BacklogPage() {
 
   useEffect(load, [load])
 
-  // Strongest Belgian evidence first, so the reviewer can tick the obvious
-  // ones in bulk and spend attention on the weak tail.
-  const scored: Scored[] = useMemo(
-    () =>
-      items
-        .map((i) => ({ ...i, be: scoreAccount(PROFILES.BE, { handle: i.handle, displayName: i.displayName, description: i.description }) }))
-        .sort((a, b) => b.be.score - a.be.score),
-    [items],
-  )
+  // With a country profile set, strongest local evidence first, so the
+  // reviewer can tick the obvious ones in bulk and spend attention on the weak
+  // tail. Without one, keep the server order and skip scoring entirely.
+  const scored: Scored[] = useMemo(() => {
+    const empty: SignalResult = { score: 0, signals: [] }
+    const list = items.map((i) => ({
+      ...i,
+      sig: profile ? scoreAccount(profile, { handle: i.handle, displayName: i.displayName, description: i.description }) : empty,
+    }))
+    return profile ? list.sort((a, b) => b.sig.score - a.sig.score) : list
+  }, [items, profile])
 
   function drop(dids: string[]) {
     const gone = new Set(dids)
@@ -197,7 +200,7 @@ export default function BacklogPage() {
     }
   }
 
-  const strong = scored.filter((i) => i.be.score >= STRONG_SCORE && i.handle !== BROKEN_HANDLE)
+  const strong = scored.filter((i) => i.sig.score >= STRONG_SCORE && i.handle !== BROKEN_HANDLE)
 
   return (
     <div className="space-y-6">
@@ -225,7 +228,7 @@ export default function BacklogPage() {
       {scored.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            {busy ?? `${scored.length} pending · ${strong.length} with strong Belgian signals · ${sel.size} selected`}
+            {busy ?? `${scored.length} pending${profile ? ` · ${strong.length} with strong ${profile.adjective} signals` : ''} · ${sel.size} selected`}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => setSel(new Set(strong.map((i) => i.subjectDid)))}>
@@ -277,13 +280,15 @@ export default function BacklogPage() {
               badges={
                 <>
                   {i.handle === BROKEN_HANDLE && <Badge variant="destructive">handle not resolving</Badge>}
-                  <Badge
-                    variant={i.be.score >= STRONG_SCORE ? 'default' : i.be.score > 0 ? 'secondary' : 'outline'}
-                    title="Belgian evidence score"
-                  >
-                    BE {i.be.score}
-                    {i.be.signals.length > 0 && ` · ${i.be.signals.join(' · ')}`}
-                  </Badge>
+                  {profile && (
+                    <Badge
+                      variant={i.sig.score >= STRONG_SCORE ? 'default' : i.sig.score > 0 ? 'secondary' : 'outline'}
+                      title={`${profile.adjective} evidence score`}
+                    >
+                      {`${profile.code} ${i.sig.score}`}
+                      {i.sig.signals.length > 0 && ` · ${i.sig.signals.join(' · ')}`}
+                    </Badge>
+                  )}
                 </>
               }
               actions={

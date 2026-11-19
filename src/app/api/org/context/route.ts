@@ -24,10 +24,12 @@ export async function GET() {
   // *for*, whereas `handle` is the caller's own display identity.
   let orgHandle: string | null = null
   let verifiedCount: number | null = null
+  let country: string | null = null
   if (active) {
     const orgRows = await db.select().from(orgs).where(eq(orgs.id, active.orgId))
     const org = orgRows[0]
     orgHandle = org?.handle ?? null
+    country = org?.country ?? null
     // An owner's display identity is the org's own handle; a helper's handle
     // is captured at invite time on the membership row.
     handle = active.role === 'owner' ? (org?.handle ?? active.handle ?? null) : (active.handle ?? null)
@@ -56,5 +58,6 @@ export async function GET() {
     orgHandle,
     avatar,
     verifiedCount,
+    country,
   })
 }

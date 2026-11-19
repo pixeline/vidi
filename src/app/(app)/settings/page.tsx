@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { parseKeywords } from '@/lib/keywords'
+import { PROFILES } from '@/lib/signals/profiles'
 
 type Seed = { id: number; keyword: string; enabled: boolean }
 
@@ -17,11 +18,15 @@ export function SettingsView({
   orgId,
   seeds: initialSeeds,
   accountsCount,
+  country = null,
+  onCountrySaved,
 }: {
   role: string
   orgId: number
   seeds: Seed[]
   accountsCount: number | null
+  country?: string | null
+  onCountrySaved?: () => void
 }) {
   const [seeds, setSeeds] = useState(initialSeeds)
   const [newKeyword, setNewKeyword] = useState('')
@@ -71,6 +76,18 @@ export function SettingsView({
       return
     }
     setSeeds((prev) => prev.map((s) => (s.keyword === keyword ? { ...s, enabled } : s)))
+  }
+
+  async function saveCountry(value: string) {
+    const res = await fetch('/vidi/api/org/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ orgId, country: value || null }),
+    })
+    if (!res.ok) {
+      toast.error('Could not update country profile')
+      return
+    }
+    onCountrySaved?.()
   }
 
   async function runCrawlNow() {
@@ -123,7 +140,7 @@ export function SettingsView({
               <Input
                 id="new-keyword"
                 value={newKeyword}
-                placeholder="Brussels, Antwerp, Ghent…"
+                placeholder="City names, regions, institutions…"
                 onChange={(e) => setNewKeyword(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">Separate multiple keywords with commas or spaces.</p>
@@ -149,6 +166,34 @@ export function SettingsView({
       </Card>
 
       {role === 'owner' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Country profile</CardTitle>
+            <CardDescription>
+              Ranks the To Be Verified list by local evidence for this country. Choose None to keep the
+              list unscored.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Label htmlFor="country-profile" className="sr-only">
+              Country profile
+            </Label>
+            <select
+              id="country-profile"
+              value={country ?? ''}
+              onChange={(e) => void saveCountry(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">None</option>
+              {Object.values(PROFILES).map((p) => (
+                <option key={p.code} value={p.code}>{`${p.name} (${p.code})`}</option>
+              ))}
+            </select>
+          </CardContent>
+        </Card>
+      )}
+
+      {role === 'owner' && (
         <Button onClick={runCrawlNow} disabled={running}>
           {running ? 'Starting…' : 'Run crawl now'}
         </Button>
@@ -158,7 +203,7 @@ export function SettingsView({
 }
 
 export default function SettingsPage() {
-  const { orgId, role, loading } = useOrg()
+  const { orgId, role, loading, country, refresh } = useOrg()
   const [seeds, setSeeds] = useState<Seed[]>([])
   const [accountsCount, setAccountsCount] = useState<number | null>(null)
 
@@ -180,5 +225,5 @@ export default function SettingsPage() {
   }, [orgId, role])
 
   if (loading || !orgId || !role) return null
-  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} />
+  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} />
 }

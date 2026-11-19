@@ -41,6 +41,7 @@ export const orgs = pgTable('orgs', {
   scopes: text('scopes'),
   status: text('status').notNull().default('active'),
   onboardedByDid: text('onboarded_by_did'),
+  country: text('country'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
