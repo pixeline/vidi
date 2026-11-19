@@ -14,6 +14,7 @@ const BASE_NAV_LINKS = [
   { href: '/search', label: 'Search' },
   { href: '/backlog', label: 'Backlog' },
   { href: '/members', label: 'Members' },
+  { href: '/activity', label: 'Activity' },
 ]
 
 function ActorIdentity({ handle, avatar }: { handle: string | null; avatar: string | null }) {
