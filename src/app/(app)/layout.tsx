@@ -35,7 +35,7 @@ function ActorIdentity({ handle, avatar }: { handle: string | null; avatar: stri
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { orgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, refresh } = useOrg()
+  const { orgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, orgs, selectOrg, refresh } = useOrg()
   // Settings (crawl keywords) is open to any active member — owner or helper —
   // not just the owner. Hidden for non-members (no org context to manage).
   const navLinks = role ? [...BASE_NAV_LINKS, { href: '/settings', label: 'Settings' }] : BASE_NAV_LINKS
@@ -89,14 +89,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <VidiMark className="size-6 shrink-0" />
               <span className="text-lg font-semibold tracking-tight">Vidi</span>
             </Link>
-            {orgHandle && (
+            {orgs && orgs.length > 1 ? (
               <span className="text-sm text-muted-foreground">
                 <span className="mx-0.5" aria-hidden>
                   /
                 </span>
-                <span className="font-medium text-foreground">{orgHandle}</span>
+                <select
+                  aria-label="Organization"
+                  value={orgId ?? ''}
+                  onChange={(e) => selectOrg(Number(e.target.value))}
+                  className="rounded-md border bg-background px-2 py-1 text-sm font-medium text-foreground"
+                >
+                  {orgs.map((o) => (
+                    <option key={o.orgId} value={o.orgId}>
+                      {o.handle}
+                    </option>
+                  ))}
+                </select>
                 {verifiedCount != null && ` (${verifiedCount} verified)`}
               </span>
+            ) : (
+              orgHandle && (
+                <span className="text-sm text-muted-foreground">
+                  <span className="mx-0.5" aria-hidden>
+                    /
+                  </span>
+                  <span className="font-medium text-foreground">{orgHandle}</span>
+                  {verifiedCount != null && ` (${verifiedCount} verified)`}
+                </span>
+              )
             )}
           </div>
           <nav className="flex items-center gap-4">

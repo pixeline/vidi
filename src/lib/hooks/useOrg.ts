@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { subscribeVerifiedCountChanged } from '../verifiedCountBus'
 
-// v1: single-org context resolved from /vidi/api/org/context; stored in state.
+// Org context resolved from /vidi/api/org/context (the session's selected org).
+export type OrgSummary = { orgId: number; handle: string; role: 'owner' | 'helper' }
+
 export function useOrg() {
   const [orgId, setOrgId] = useState<number | null>(null)
   const [role, setRole] = useState<string | null>(null)
@@ -14,6 +16,7 @@ export function useOrg() {
   const [loading, setLoading] = useState(true)
   const [verifiedCount, setVerifiedCount] = useState<number | null>(null)
   const [country, setCountry] = useState<string | null>(null)
+  const [orgs, setOrgs] = useState<OrgSummary[]>([])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -29,6 +32,7 @@ export function useOrg() {
       setAvatar(d.avatar ?? null)
       setVerifiedCount(d.verifiedCount ?? null)
       setCountry(d.country ?? null)
+      setOrgs(d.orgs ?? [])
     } catch {
       setAuthenticated(false)
       setOrgId(null)
@@ -39,10 +43,23 @@ export function useOrg() {
       setAvatar(null)
       setVerifiedCount(null)
       setCountry(null)
+      setOrgs([])
     } finally {
       setLoading(false)
     }
   }, [])
+
+  const selectOrg = useCallback(
+    async (id: number) => {
+      await fetch('/vidi/api/org/select', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ orgId: id }),
+      })
+      await refresh()
+    },
+    [refresh]
+  )
 
   useEffect(() => {
     refresh()
@@ -53,5 +70,5 @@ export function useOrg() {
   // the new count without a full page reload — see verifiedCountBus.ts.
   useEffect(() => subscribeVerifiedCountChanged(refresh), [refresh])
 
-  return { orgId, setOrgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, refresh }
+  return { orgId, setOrgId, role, isAllowlisted, handle, orgHandle, avatar, authenticated, loading, verifiedCount, country, orgs, selectOrg, refresh }
 }

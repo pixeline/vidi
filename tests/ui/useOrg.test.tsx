@@ -37,4 +37,23 @@ describe('useOrg', () => {
 
     await waitFor(() => expect(result.current.verifiedCount).toBe(2))
   })
+
+  it('exposes orgs and selectOrg POSTs then refreshes', async () => {
+    const calls: any[] = []
+    ;(global.fetch as any).mockImplementation(async (url: string, init?: any) => {
+      calls.push([url, init?.method ?? 'GET'])
+      return {
+        status: 200,
+        json: async () => ({ orgId: 1, orgs: [{ orgId: 1, handle: 'a', role: 'owner' }, { orgId: 2, handle: 'b', role: 'helper' }] }),
+      }
+    })
+    const { result } = renderHook(() => useOrg())
+    await waitFor(() => expect(result.current.orgs).toHaveLength(2))
+    await act(async () => {
+      await result.current.selectOrg(2)
+    })
+    const post = calls.find((c) => c[0] === '/vidi/api/org/select')
+    expect(post).toEqual(['/vidi/api/org/select', 'POST'])
+    expect(calls.filter((c) => c[0] === '/vidi/api/org/context').length).toBeGreaterThanOrEqual(2)
+  })
 })

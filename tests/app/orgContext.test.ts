@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getActor = vi.fn()
+const sessionHolder = vi.hoisted(() => ({ activeOrgId: undefined as number | undefined }))
 const isAllowlisted = vi.fn()
 const countOrgVerifications = vi.fn()
 const getActorAvatar = vi.fn()
 
-vi.mock('../../src/lib/authz/session', () => ({ getActor: () => getActor() }))
+vi.mock('../../src/lib/authz/session', () => ({
+  getActor: () => getActor(),
+  getSession: async () => ({ activeOrgId: sessionHolder.activeOrgId }),
+}))
 vi.mock('../../src/lib/allowlist', () => ({ isAllowlisted: (did: string) => isAllowlisted(did) }))
 vi.mock('../../src/lib/verify/verifiedCount', () => ({ countOrgVerifications: (did: string) => countOrgVerifications(did) }))
 vi.mock('../../src/lib/atproto/profileCache', () => ({ getActorAvatar: (did: string) => getActorAvatar(did) }))
@@ -46,6 +50,7 @@ describe('GET /api/org/context', () => {
     countOrgVerifications.mockReset()
     getActorAvatar.mockReset()
     getActorAvatar.mockResolvedValue('https://av.example/pic.jpg')
+    sessionHolder.activeOrgId = undefined
     rowsHolder.memberRows = []
     rowsHolder.orgRows = []
     rowsHolder.verificationCountRows = []
@@ -76,6 +81,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 42,
       country: 'BE',
+      orgs: [{ orgId: 7, handle: 'org.example.com', role: 'owner' }],
     })
     expect(countOrgVerifications).toHaveBeenCalledWith('did:plc:org')
   })
@@ -97,6 +103,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 5,
       country: null,
+      orgs: [{ orgId: 7, handle: 'org.example.com', role: 'helper' }],
     })
   })
 
@@ -128,6 +135,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: null,
       country: null,
+      orgs: [],
     })
   })
 
@@ -140,5 +148,56 @@ describe('GET /api/org/context', () => {
     const body = await res.json()
     expect(body.orgId).toBeNull()
     expect(body.isAllowlisted).toBe(true)
+  })
+
+  describe('several memberships', () => {
+    const two = () => {
+      rowsHolder.memberRows = [
+        { orgId: 2, role: 'helper', status: 'active', handle: 'me.it' },
+        { orgId: 1, role: 'owner', status: 'active', handle: 'me.be' },
+      ]
+      rowsHolder.orgRows = [
+        { id: 1, did: 'did:plc:be', handle: 'be.example', country: 'BE' },
+        { id: 2, did: 'did:plc:it', handle: 'it.example', country: 'IT' },
+      ]
+    }
+    beforeEach(() => {
+      getActor.mockResolvedValue({ did: 'did:plc:me' })
+      isAllowlisted.mockResolvedValue(false)
+      countOrgVerifications.mockResolvedValue(1)
+    })
+
+    it('selects the session activeOrgId and lists every active membership by orgId', async () => {
+      two()
+      sessionHolder.activeOrgId = 2
+      const body = await (await GET()).json()
+      expect(body.orgId).toBe(2)
+      expect(body.role).toBe('helper')
+      expect(body.handle).toBe('me.it')
+      expect(body.orgHandle).toBe('it.example')
+      expect(body.country).toBe('IT')
+      expect(body.orgs).toEqual([
+        { orgId: 1, handle: 'be.example', role: 'owner' },
+        { orgId: 2, handle: 'it.example', role: 'helper' },
+      ])
+      expect(countOrgVerifications).toHaveBeenCalledWith('did:plc:it')
+    })
+
+    it('falls back to the first org when activeOrgId matches no membership', async () => {
+      two()
+      sessionHolder.activeOrgId = 9
+      const body = await (await GET()).json()
+      expect(body.orgId).toBe(1)
+      expect(body.orgs).toHaveLength(2)
+    })
+
+    it('excludes revoked memberships from orgs', async () => {
+      two()
+      rowsHolder.memberRows[1].status = 'revoked'
+      sessionHolder.activeOrgId = 1
+      const body = await (await GET()).json()
+      expect(body.orgs).toEqual([{ orgId: 2, handle: 'it.example', role: 'helper' }])
+      expect(body.orgId).toBe(2)
+    })
   })
 })

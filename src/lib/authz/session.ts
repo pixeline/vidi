@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { requireEnv } from '../env'
 import { isLoopbackBase } from '../atproto/oauthClient'
 
-export type ActorSession = { did?: string }
+export type ActorSession = { did?: string; activeOrgId?: number }
 
 /**
  * The session cookie's `secure` flag must be false when running the local
