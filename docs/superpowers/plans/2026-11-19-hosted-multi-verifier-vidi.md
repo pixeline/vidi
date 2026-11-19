@@ -484,7 +484,8 @@ Expected: PASS.
 
 ## Ops Checklist (not code; for the operator after the phases ship)
 
-- **After Phase 2 deploys:** the Belgian owner signs out, signs in as `belgium-atmosphe.re` with "verifier account" ticked, and clicks Onboard again. This replaces the stored `transition:generic` session with the narrow one.
+- **Before merging:** run the loopback smoke test from Task 5 Step 5 on a test account.
+- **After Phase 2 deploys:** the Belgian owner signs in as `belgium-atmosphe.re` (verification access is now requested automatically for an active org account), then verifies and revokes one test account to confirm writes work.
 - **Neutral domain (open decision):** pick a hostname that isn't country-specific. Then:
   1. add an Nginx server block proxying `/vidi` to `127.0.0.1:3010`;
   2. issue a TLS cert;

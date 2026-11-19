@@ -60,8 +60,8 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <p>
-              An owner can open Settings and choose Disconnect. Vidi revokes its token at once and
-              can no longer act on the account.
+              An owner can open Settings and choose Disconnect. Vidi deletes its session immediately
+              and asks your server to revoke the token.
             </p>
             <p>
               To have all of your organization&apos;s data deleted, ask the{' '}
