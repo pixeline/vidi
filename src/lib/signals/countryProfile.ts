@@ -5,20 +5,25 @@
  * 🇧🇪 + Brussels + KU Leuven = 3 + 2 + 2 = 7, a lone `.be` handle = 3.
  * Empirically (Belgium), score ≥ 3 was ~90% precise and ≥ 5 effectively 100%.
  */
-export type CountryProfile = {
-  code: string // 'BE'
+export type SignalProfile = {
+  code: string // 'BE', or 'Match' for a signal-words-only profile
   name: string // 'Belgium' (Settings option label)
   adjective: string // 'Belgian' (UI copy: "strong Belgian signals")
-  flag: string // '🇧🇪'
-  tlds: string[] // ['be']
+  flag?: string // '🇧🇪'; no flag check when absent
+  tlds: string[] // ['be'] or handle domains like ['lemonde.fr']
   rules: { name: string; weight: number; words: string[] }[]
   places: Record<string, string[]> // display name -> variants
 }
+export type CountryProfile = SignalProfile
 
 export type SignalResult = { score: number; signals: string[] }
 
 // Score ≥ 3 was ~90% precise in the list-grower's manual audit (one solid signal).
 export const STRONG_SCORE = 3
+
+// Escapes regex syntax characters only: under the /u flag any other escape
+// (e.g. `\-`) is a SyntaxError.
+export const regexEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
 
 // JS `\b` is ASCII-only (even with /u), so accented endings like "belgië"
 // would never match; use Unicode-aware letter/number lookarounds instead.
@@ -26,19 +31,21 @@ const word = (alts: string) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${alts})(?![\\p
 
 type Compiled = {
   tldPatterns: { tld: string; re: RegExp }[]
-  flag: RegExp
+  flag: RegExp | null
   rules: { name: string; weight: number; re: RegExp }[]
   places: [string, RegExp][]
 }
 
-const cache = new WeakMap<CountryProfile, Compiled>()
+const cache = new WeakMap<SignalProfile, Compiled>()
 
-function compile(p: CountryProfile): Compiled {
+function compile(p: SignalProfile): Compiled {
   let c = cache.get(p)
   if (!c) {
     c = {
-      tldPatterns: p.tlds.map((tld) => ({ tld, re: new RegExp(`\\.${tld}$`, 'i') })),
-      flag: new RegExp(p.flag, 'u'),
+      // The handle is the domain itself or a subdomain of it: `be` matches
+      // `x.be`, `lemonde.fr` matches `lemonde.fr` and `jane.lemonde.fr`.
+      tldPatterns: p.tlds.map((tld) => ({ tld, re: new RegExp(`(?:^|\\.)${regexEscape(tld)}$`, 'i') })),
+      flag: p.flag ? new RegExp(regexEscape(p.flag), 'u') : null,
       rules: p.rules.map((r) => ({ name: r.name, weight: r.weight, re: word(r.words.join('|')) })),
       places: Object.entries(p.places).map(([name, variants]) => [name, word(variants.join('|'))]),
     }
@@ -48,7 +55,7 @@ function compile(p: CountryProfile): Compiled {
 }
 
 export function scoreAccount(
-  p: CountryProfile,
+  p: SignalProfile,
   acc: { handle?: string | null; displayName?: string | null; description?: string | null },
 ): SignalResult {
   const c = compile(p)
@@ -63,7 +70,7 @@ export function scoreAccount(
       score += 3
     }
   }
-  if (c.flag.test(text)) {
+  if (c.flag && p.flag && c.flag.test(text)) {
     signals.push(p.flag)
     score += 3
   }

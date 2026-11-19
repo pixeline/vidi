@@ -53,6 +53,32 @@ describe('scoreAccount IT', () => {
   })
 })
 
+describe('scoreAccount FR/ES/NL/NO', () => {
+  it('FR: flag + institution + city', () => {
+    const r = scoreAccount(PROFILES.FR, { handle: 'a.bsky.social', description: '🇫🇷 chercheuse au CNRS, Lyon' })
+    expect(r.score).toBe(3 + 2 + 2)
+    expect(r.signals).toEqual(expect.arrayContaining(['🇫🇷', 'institution', 'Lyon']))
+  })
+
+  it('ES: .es handle', () => {
+    expect(scoreAccount(PROFILES.ES, { handle: 'mario.es' })).toEqual({ score: 3, signals: ['.es handle'] })
+  })
+
+  it('NL: nationality + city', () => {
+    const r = scoreAccount(PROFILES.NL, { handle: 'a.bsky.social', description: 'Dutch journalist in Utrecht' })
+    expect(r.score).toBe(1 + 2)
+    expect(r.signals).toEqual(['nationality', 'Utrecht'])
+  })
+
+  it('NL: does not fire on words common in other languages', () => {
+    expect(scoreAccount(PROFILES.NL, { handle: 'a.bsky.social', description: 'uva nos rug' })).toEqual({ score: 0, signals: [] })
+  })
+
+  it('NO: flag + city', () => {
+    expect(scoreAccount(PROFILES.NO, { handle: 'a.bsky.social', description: '🇳🇴 Oslo' }).score).toBe(5)
+  })
+})
+
 describe('profileFor', () => {
   it('returns null for missing or unknown codes', () => {
     expect(profileFor(null)).toBeNull()

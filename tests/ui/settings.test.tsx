@@ -16,7 +16,15 @@ describe('SettingsView country profile', () => {
     render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} country="BE" onCountrySaved={onCountrySaved} />)
     const select = screen.getByLabelText('Country profile') as HTMLSelectElement
     expect(select.tagName).toBe('SELECT')
-    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['None', 'Belgium (BE)', 'Italy (IT)'])
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual([
+      'None',
+      'Belgium (BE)',
+      'Italy (IT)',
+      'France (FR)',
+      'Spain (ES)',
+      'Netherlands (NL)',
+      'Norway (NO)',
+    ])
     expect(select.value).toBe('BE')
     fireEvent.change(select, { target: { value: 'IT' } })
     await waitFor(() =>
