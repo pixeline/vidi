@@ -43,6 +43,13 @@
       "when": 1795048433034,
       "tag": "0005_aromatic_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795051560357,
+      "tag": "0006_slim_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

@@ -70,4 +70,64 @@ describe('PATCH /api/org/settings', () => {
     expect(res.status).toBe(200)
     expect(setSpy).toHaveBeenCalledWith({ country: null })
   })
+
+  it('accepts any ISO country, not just curated ones', async () => {
+    const res = await PATCH(req({ orgId: 1, country: 'PT' }))
+    expect(res.status).toBe(200)
+    expect(setSpy).toHaveBeenCalledWith({ country: 'PT' })
+  })
+
+  it('updates only signalTerms when only signalTerms is sent', async () => {
+    const res = await PATCH(req({ orgId: 1, signalTerms: 'Journalist, Le Monde\nlemonde.fr, journalist' }))
+    expect(res.status).toBe(200)
+    expect(setSpy).toHaveBeenCalledWith({ signalTerms: ['journalist', 'le monde', 'lemonde.fr'] })
+  })
+
+  it('accepts signalTerms as an array and clears them with an empty list', async () => {
+    await PATCH(req({ orgId: 1, signalTerms: ['Reporter', 'editor'] }))
+    expect(setSpy).toHaveBeenLastCalledWith({ signalTerms: ['reporter', 'editor'] })
+    await PATCH(req({ orgId: 1, signalTerms: [] }))
+    expect(setSpy).toHaveBeenLastCalledWith({ signalTerms: [] })
+  })
+
+  it('updates both fields when both are sent', async () => {
+    await PATCH(req({ orgId: 1, country: 'fr', signalTerms: ['journalist'] }))
+    expect(setSpy).toHaveBeenCalledWith({ country: 'FR', signalTerms: ['journalist'] })
+  })
+
+  it('rejects more than 100 terms with 400 too_many_terms', async () => {
+    const terms = Array.from({ length: 101 }, (_, i) => `term${i}`)
+    const res = await PATCH(req({ orgId: 1, signalTerms: terms }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'too_many_terms' })
+    expect(setSpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a term longer than 60 characters with 400 term_too_long', async () => {
+    const res = await PATCH(req({ orgId: 1, signalTerms: ['a'.repeat(61)] }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'term_too_long' })
+    expect(setSpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects signalTerms that are neither a string nor a list of strings', async () => {
+    const res = await PATCH(req({ orgId: 1, signalTerms: [1, 2] }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid_signal_terms' })
+    expect(setSpy).not.toHaveBeenCalled()
+  })
+
+  it('rejects a body with neither field with 400 nothing_to_update', async () => {
+    const res = await PATCH(req({ orgId: 1 }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'nothing_to_update' })
+    expect(setSpy).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 to a helper saving signal words, without updating', async () => {
+    assertOwner.mockRejectedValue(new AuthzError('owner required'))
+    const res = await PATCH(req({ orgId: 1, signalTerms: ['journalist'] }))
+    expect(res.status).toBe(403)
+    expect(setSpy).not.toHaveBeenCalled()
+  })
 })

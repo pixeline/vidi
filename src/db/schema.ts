@@ -42,6 +42,8 @@ export const orgs = pgTable('orgs', {
   status: text('status').notNull().default('active'),
   onboardedByDid: text('onboarded_by_did'),
   country: text('country'),
+  // Owner-typed ranking signal words (lowercased, deduped); see lib/signals/customTerms.
+  signalTerms: text('signal_terms').array().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 

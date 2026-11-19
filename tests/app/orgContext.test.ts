@@ -68,7 +68,9 @@ describe('GET /api/org/context', () => {
     canOnboard.mockResolvedValue(true)
     countOrgVerifications.mockResolvedValue(42)
     rowsHolder.memberRows = [{ orgId: 7, role: 'owner', status: 'active', handle: 'stale.owner' }]
-    rowsHolder.orgRows = [{ id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE', status: 'active' }]
+    rowsHolder.orgRows = [
+      { id: 7, did: 'did:plc:org', handle: 'org.example.com', country: 'BE', signalTerms: ['journalist', 'lesoir.be'], status: 'active' },
+    ]
 
     const res = await GET()
     expect(res.status).toBe(200)
@@ -81,6 +83,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 42,
       country: 'BE',
+      signalTerms: ['journalist', 'lesoir.be'],
       orgStatus: 'active',
       ownOrgStatus: 'active',
       orgs: [{ orgId: 7, handle: 'org.example.com', role: 'owner' }],
@@ -105,6 +108,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: 5,
       country: null,
+      signalTerms: [],
       orgStatus: 'active',
       ownOrgStatus: null,
       orgs: [{ orgId: 7, handle: 'org.example.com', role: 'helper' }],
@@ -139,6 +143,7 @@ describe('GET /api/org/context', () => {
       avatar: 'https://av.example/pic.jpg',
       verifiedCount: null,
       country: null,
+      signalTerms: [],
       orgStatus: null,
       ownOrgStatus: null,
       orgs: [],
@@ -207,7 +212,7 @@ describe('GET /api/org/context', () => {
       ]
       rowsHolder.orgRows = [
         { id: 1, did: 'did:plc:be', handle: 'be.example', country: 'BE' },
-        { id: 2, did: 'did:plc:it', handle: 'it.example', country: 'IT' },
+        { id: 2, did: 'did:plc:it', handle: 'it.example', country: 'IT', signalTerms: ['giornalista'] },
       ]
     }
     beforeEach(() => {
@@ -225,6 +230,7 @@ describe('GET /api/org/context', () => {
       expect(body.handle).toBe('me.it')
       expect(body.orgHandle).toBe('it.example')
       expect(body.country).toBe('IT')
+      expect(body.signalTerms).toEqual(['giornalista'])
       expect(body.orgs).toEqual([
         { orgId: 1, handle: 'be.example', role: 'owner' },
         { orgId: 2, handle: 'it.example', role: 'helper' },

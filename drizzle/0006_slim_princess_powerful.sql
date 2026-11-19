@@ -1,0 +1,1 @@
+ALTER TABLE "orgs" ADD COLUMN "signal_terms" text[] DEFAULT '{}' NOT NULL;

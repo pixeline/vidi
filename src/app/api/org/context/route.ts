@@ -43,11 +43,13 @@ export async function GET() {
   let orgHandle: string | null = null
   let verifiedCount: number | null = null
   let country: string | null = null
+  let signalTerms: string[] = []
   let orgStatus: string | null = null
   if (active) {
     const org = orgById.get(active.orgId)
     orgHandle = org?.handle ?? null
     country = org?.country ?? null
+    signalTerms = org?.signalTerms ?? []
     orgStatus = org?.status ?? null
     // An owner's display identity is the org's own handle; a helper's handle
     // is captured at invite time on the membership row.
@@ -78,6 +80,7 @@ export async function GET() {
     avatar,
     verifiedCount,
     country,
+    signalTerms,
     orgStatus,
     ownOrgStatus,
     orgs: orgList,
