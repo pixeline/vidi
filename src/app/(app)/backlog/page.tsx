@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
-import { belgianSignals, type BelgianSignals } from '@/lib/belgianSignals'
+import { scoreAccount, STRONG_SCORE, type SignalResult } from '@/lib/signals/countryProfile'
+import { PROFILES } from '@/lib/signals/profiles'
 import { extractDids } from '@/lib/extractDids'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,12 +21,10 @@ type BacklogItem = {
   verifiers?: { did: string; handle: string | null }[]
 }
 
-type Scored = BacklogItem & { be: BelgianSignals }
+type Scored = BacklogItem & { be: SignalResult }
 
 // Mirrors /api/verify's default VIDI_BATCH_MAX so bulk verifies never trip the cap.
 const VERIFY_BATCH = 50
-// Score ≥ 3 was ~90% precise in the list-grower's manual audit (one solid signal).
-const STRONG_SCORE = 3
 // The AppView reports this when a handle's DNS/well-known no longer points at
 // the DID. A verification issued now would embed it and not render as valid,
 // so such accounts are flagged and never bulk-selected.
@@ -53,7 +52,7 @@ export default function BacklogPage() {
   const scored: Scored[] = useMemo(
     () =>
       items
-        .map((i) => ({ ...i, be: belgianSignals({ handle: i.handle, displayName: i.displayName, description: i.description }) }))
+        .map((i) => ({ ...i, be: scoreAccount(PROFILES.BE, { handle: i.handle, displayName: i.displayName, description: i.description }) }))
         .sort((a, b) => b.be.score - a.be.score),
     [items],
   )
