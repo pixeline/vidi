@@ -98,7 +98,7 @@ describe('POST /api/org/onboard', () => {
       })
     )
     expect(onConflictDoUpdateOrgs).toHaveBeenCalledWith(
-      expect.objectContaining({ target: 'orgs.did', set: { handle: 'org.example.com', status: 'active' } })
+      expect.objectContaining({ target: 'orgs.did', set: { handle: 'org.example.com', status: 'active', scopes: 'atproto repo:app.bsky.graph.verification' } })
     )
     expect(valuesMembers).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: 42, memberDid: 'did:plc:org', handle: 'org.example.com', role: 'owner' })

@@ -47,7 +47,7 @@ export async function POST() {
     })
     .onConflictDoUpdate({
       target: orgs.did,
-      set: { handle, status: 'active' },
+      set: { handle, status: 'active', scopes: scope },
     })
     .returning()
 

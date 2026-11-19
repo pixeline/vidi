@@ -14,6 +14,11 @@ export const MEMBER_SCOPE = 'atproto'
  * True when a granted scope string lets us write verification records:
  * a `repo:app.bsky.graph.verification` token (optionally with `?action=...`)
  * or the legacy `transition:generic` that older org sessions hold.
+ *
+ * Deliberately rejects `repo:*` and the `repo?collection=...` form: those are
+ * fail-safe false negatives (we never request them, so a miss only asks the
+ * user to sign in again). The `atproto` token itself is guaranteed by
+ * @atproto/oauth-client's token-response validation, so it is not re-checked.
  */
 export function hasVerificationScope(scope: string): boolean {
   return scope.split(/\s+/).some((token) => {
