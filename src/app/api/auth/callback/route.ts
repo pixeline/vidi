@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { getOAuthClient, hasVerificationScope, ORG_SCOPE } from '@/lib/atproto/oauthClient'
 import { getSession } from '@/lib/authz/session'
 import { requireEnv } from '@/lib/env'
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const client = await getOAuthClient()
   const { session, state } = await client.callback(req.nextUrl.searchParams)
 
-  // The login route cannot always tell an org account apart (PDS URL input,
+  // The login route cannot always tell an org account (active or disconnected) apart (PDS URL input,
   // AppView failure) and may have asked for MEMBER_SCOPE; that grant has now
   // replaced the org's stored writer session. Ask once more for ORG_SCOPE
   // before signing in. After that round trip, sign in whatever was granted so
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const [org] = await db
       .select()
       .from(orgs)
-      .where(and(eq(orgs.did, session.did), eq(orgs.status, 'active')))
+      .where(eq(orgs.did, session.did))
     if (org && !hasVerificationScope((await session.getTokenInfo()).scope)) {
       const url = await client.authorize(session.did, { scope: ORG_SCOPE, state: ORG_REAUTH_STATE })
       return NextResponse.redirect(url.toString())

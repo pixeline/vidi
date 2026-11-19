@@ -175,6 +175,30 @@ describe('AppLayout', () => {
       expect(screen.getByRole('button', { name: 'Reconnect' })).toBeTruthy()
     })
 
+    it('passes the signed-in account handle to OnboardOrg for the org consent redirect', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ error: 'no_org_session' }) })
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ url: 'https://pds.example/authorize' }) })
+      vi.stubGlobal('fetch', fetchMock)
+      const originalLocation = window.location
+      Object.defineProperty(window, 'location', { configurable: true, value: { href: 'http://x/vidi/search' } })
+      try {
+        useOrgMock.mockReturnValue({
+          ...base, handle: 'italiatmosphe.re', orgId: 1, role: 'owner', canOnboard: true, orgHandle: 'be.example',
+          orgs: [{ orgId: 1, handle: 'be.example', role: 'owner' }],
+          orgStatus: 'disconnected', ownOrgStatus: 'disconnected',
+        })
+        render(<AppLayout>{null}</AppLayout>)
+        fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ handle: 'italiatmosphe.re', asOrg: true })
+      } finally {
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+        vi.unstubAllGlobals()
+      }
+    })
+
     it('does not offer Reconnect or Onboard to the owner of an active org', () => {
       useOrgMock.mockReturnValue({
         ...base, orgId: 1, role: 'owner', canOnboard: true, orgHandle: 'be.example',

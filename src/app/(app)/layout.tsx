@@ -153,7 +153,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main key={orgId ?? 'none'} className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        {showOnboard && <OnboardOrg onOnboarded={refresh} reconnect={reconnect} />}
+        {showOnboard && <OnboardOrg onOnboarded={refresh} reconnect={reconnect} accountHandle={handle} />}
         {showPausedBanner && (
           <Card className="mb-6 border-destructive/30 bg-destructive/5">
             <CardHeader>

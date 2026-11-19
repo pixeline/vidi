@@ -146,7 +146,7 @@ export function SettingsView({
 
   async function disconnect() {
     const label = orgHandle ? `@${orgHandle}` : 'this org'
-    if (!window.confirm(`Disconnect Vidi from ${label}? Members will no longer be able to verify until you onboard again.`)) return
+    if (!window.confirm(`Disconnect Vidi from ${label}? Members will no longer be able to verify until you reconnect.`)) return
     const res = await fetch('/vidi/api/org/disconnect', { method: 'POST', body: JSON.stringify({ orgId }) })
     if (!res.ok) {
       toast.error('Could not disconnect Vidi')
@@ -303,7 +303,7 @@ export function SettingsView({
             <CardTitle>Disconnect Vidi</CardTitle>
             <CardDescription>
               Revokes Vidi&apos;s access to your verifier account. Members, backlog and activity history are kept.
-              Onboard again to reconnect.
+              Use Reconnect at the top of the page to turn it back on.
             </CardDescription>
           </CardHeader>
           <CardContent>

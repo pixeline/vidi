@@ -45,8 +45,21 @@ describe('GET /api/auth/callback', () => {
     callback.mockResolvedValue({ session: oauthSession('did:plc:org', MEMBER_SCOPE), state: null })
     selectOrgs.mockImplementation(async (cond: any) => {
       expect(JSON.stringify(cond)).toContain('did:plc:org')
-      expect(JSON.stringify(cond)).toContain('active')
       return [{ id: 1, did: 'did:plc:org', status: 'active' }]
+    })
+    const res = await GET(req())
+    expect(authorize).toHaveBeenCalledWith('did:plc:org', { scope: ORG_SCOPE, state: 'org-reauth' })
+    expect(res.headers.get('location')).toBe('https://pds.example/authorize?org')
+    expect(save).not.toHaveBeenCalled()
+    expect(sessionHolder.s.did).toBeUndefined()
+  })
+
+  it('re-asks a disconnected org with a narrow grant for ORG_SCOPE (no status filter, no sign-in)', async () => {
+    callback.mockResolvedValue({ session: oauthSession('did:plc:org', MEMBER_SCOPE), state: null })
+    selectOrgs.mockImplementation(async (cond: any) => {
+      expect(JSON.stringify(cond)).toContain('did:plc:org')
+      expect(JSON.stringify(cond)).not.toContain('orgs.status')
+      return [{ id: 1, did: 'did:plc:org', status: 'disconnected' }]
     })
     const res = await GET(req())
     expect(authorize).toHaveBeenCalledWith('did:plc:org', { scope: ORG_SCOPE, state: 'org-reauth' })

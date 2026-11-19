@@ -85,7 +85,7 @@ describe('SearchPage verify()', () => {
 
     await waitFor(() =>
       expect(toastError).toHaveBeenCalledWith(
-        'This org has disconnected Vidi. The owner can reconnect by onboarding again.',
+        'This org has disconnected Vidi. The owner can turn it back on with Reconnect.',
       ),
     )
   })

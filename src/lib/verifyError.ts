@@ -1,5 +1,5 @@
 export const ORG_DISCONNECTED_MESSAGE =
-  'This org has disconnected Vidi. The owner can reconnect by onboarding again.'
+  'This org has disconnected Vidi. The owner can turn it back on with Reconnect.'
 
 /** Toast text for a non-ok /api/verify response. */
 export async function verifyErrorMessage(res: Response): Promise<string> {

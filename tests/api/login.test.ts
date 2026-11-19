@@ -49,22 +49,23 @@ describe('POST /api/auth/login', () => {
   it('forces ORG_SCOPE for an active org DID even when asOrg is omitted', async () => {
     resolveHandle.mockResolvedValue({ data: { did: 'did:plc:org' } })
     selectOrgs.mockImplementation(async (cond: any) => {
-      // the query must filter on this DID and on status 'active'
       expect(JSON.stringify(cond)).toContain('did:plc:org')
-      expect(JSON.stringify(cond)).toContain('active')
       return [{ id: 1, did: 'did:plc:org', status: 'active' }]
     })
     await POST(req({ handle: 'org.example.com' }) as any)
     expect(authorize).toHaveBeenCalledWith('org.example.com', { scope: ORG_SCOPE })
   })
 
-  it('does not force ORG_SCOPE for a disconnected org (query filters on active)', async () => {
+  it('forces ORG_SCOPE for a disconnected org too (the lookup does not filter on status)', async () => {
     resolveHandle.mockResolvedValue({ data: { did: 'did:plc:org' } })
-    // a disconnected org yields no row from the status = active query
-    selectOrgs.mockResolvedValue([])
+    selectOrgs.mockImplementation(async (cond: any) => {
+      expect(JSON.stringify(cond)).toContain('did:plc:org')
+      expect(JSON.stringify(cond)).not.toContain('active')
+      expect(JSON.stringify(cond)).not.toContain('orgs.status')
+      return [{ id: 1, did: 'did:plc:org', status: 'disconnected' }]
+    })
     await POST(req({ handle: 'org.example.com' }) as any)
-    expect(authorize).toHaveBeenCalledWith('org.example.com', { scope: MEMBER_SCOPE })
-    expect(JSON.stringify(selectOrgs.mock.calls[0][0])).toContain('active')
+    expect(authorize).toHaveBeenCalledWith('org.example.com', { scope: ORG_SCOPE })
   })
 
   it('falls back to the asOrg choice when resolveHandle throws', async () => {
@@ -78,7 +79,6 @@ describe('POST /api/auth/login', () => {
   it('uses a did: input directly (no resolveHandle) and forces ORG_SCOPE for an active org DID', async () => {
     selectOrgs.mockImplementation(async (cond: any) => {
       expect(JSON.stringify(cond)).toContain('did:plc:org')
-      expect(JSON.stringify(cond)).toContain('active')
       return [{ id: 1, did: 'did:plc:org', status: 'active' }]
     })
     await POST(req({ handle: 'did:plc:org' }) as any)

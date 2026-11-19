@@ -4,8 +4,38 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function OnboardOrg({ onOnboarded, reconnect = false }: { onOnboarded: () => void; reconnect?: boolean }) {
+const SIGN_IN_AGAIN_MESSAGE =
+  "Sign out, then sign in again as the verifier account with 'I'm signing in as the verifier account' ticked."
+
+export function OnboardOrg({
+  onOnboarded,
+  reconnect = false,
+  accountHandle,
+}: {
+  onOnboarded: () => void
+  reconnect?: boolean
+  accountHandle: string | null
+}) {
   const [loading, setLoading] = useState(false)
+
+  /** Ask the PDS for the org-level grant, then send the browser to consent. */
+  async function requestOrgGrant(): Promise<boolean> {
+    if (!accountHandle) return false
+    try {
+      const res = await fetch('/vidi/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: accountHandle, asOrg: true }),
+      })
+      if (!res.ok) return false
+      const { url } = await res.json()
+      if (typeof url !== 'string') return false
+      window.location.href = url
+      return true
+    } catch {
+      return false
+    }
+  }
 
   async function onboard() {
     setLoading(true)
@@ -13,14 +43,14 @@ export function OnboardOrg({ onOnboarded, reconnect = false }: { onOnboarded: ()
       const res = await fetch('/vidi/api/org/onboard', { method: 'POST' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (body?.error === 'no_org_session' || body?.error === 'missing_verification_scope') {
+          if (!(await requestOrgGrant())) toast.error(SIGN_IN_AGAIN_MESSAGE)
+          return
+        }
         const message =
           body?.error === 'not_eligible'
             ? 'Only accounts on the Trusted Verifier list can set up an org. Ask the Vidi operator to add you.'
-            : body?.error === 'no_org_session'
-              ? 'Sign in as the org account before onboarding.'
-              : body?.error === 'missing_verification_scope'
-                ? "Sign out, then sign in again as the verifier account with 'I'm signing in as the verifier account' ticked."
-                : 'Could not onboard this org.'
+            : 'Could not onboard this org.'
         toast.error(message)
         return
       }
