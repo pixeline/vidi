@@ -74,4 +74,23 @@ describe('POST /api/auth/login', () => {
     await POST(req({ handle: 'x.example.com' }) as any)
     expect(authorize).toHaveBeenLastCalledWith('x.example.com', { scope: MEMBER_SCOPE })
   })
+
+  it('uses a did: input directly (no resolveHandle) and forces ORG_SCOPE for an active org DID', async () => {
+    selectOrgs.mockImplementation(async (cond: any) => {
+      expect(JSON.stringify(cond)).toContain('did:plc:org')
+      expect(JSON.stringify(cond)).toContain('active')
+      return [{ id: 1, did: 'did:plc:org', status: 'active' }]
+    })
+    await POST(req({ handle: 'did:plc:org' }) as any)
+    expect(resolveHandle).not.toHaveBeenCalled()
+    expect(authorize).toHaveBeenCalledWith('did:plc:org', { scope: ORG_SCOPE })
+  })
+
+  it('logs a resolution failure before falling back', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    resolveHandle.mockRejectedValue(new Error('appview down'))
+    await POST(req({ handle: 'x.example.com' }) as any)
+    expect(err).toHaveBeenCalled()
+    err.mockRestore()
+  })
 })
