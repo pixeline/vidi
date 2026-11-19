@@ -22,12 +22,13 @@ const bad = (error: string) => NextResponse.json({ error }, { status: 400 })
 export async function PATCH(req: NextRequest) {
   return guard(async () => {
     const actor = await getActor(); if (!actor) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
-    const body = await req.json()
-    const { orgId } = body
+    const json = await req.json()
+    const body: Record<string, unknown> = json && typeof json === 'object' ? json : {}
+    const orgId = body.orgId as number
     await assertOwner(actor.did, orgId)
     const update: { country?: string | null; signalTerms?: string[] } = {}
     if ('country' in body) {
-      const { country } = body
+      const country = body.country
       let code: string | null = null
       if (country != null && country !== '') {
         const profile = profileFor(String(country))
