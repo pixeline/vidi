@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
+import { verifyErrorMessage } from '@/lib/verifyError'
 import { scoreAccount, STRONG_SCORE, type SignalResult } from '@/lib/signals/countryProfile'
 import { profileFor } from '@/lib/signals/profiles'
 import { extractDids } from '@/lib/extractDids'
@@ -86,7 +87,7 @@ export default function BacklogPage() {
       }),
     })
     if (!res.ok) {
-      toast.error('Verification failed')
+      toast.error(await verifyErrorMessage(res))
       return
     }
     const { results } = await res.json()
@@ -135,6 +136,8 @@ export default function BacklogPage() {
         })
         if (!res.ok) {
           failed += targets.length - i
+          const message = await verifyErrorMessage(res)
+          if (message !== 'Verification failed') toast.error(message)
           break
         }
         const { results } = (await res.json()) as { results: { did: string; outcome: string }[] }

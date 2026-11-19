@@ -6,6 +6,7 @@ import { AccountCard } from '@/components/AccountCard'
 import { Button } from '@/components/ui/button'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { notifyVerifiedCountChanged } from '@/lib/verifiedCountBus'
+import { verifyErrorMessage } from '@/lib/verifyError'
 
 type Account = {
   did: string
@@ -54,7 +55,7 @@ export default function SearchPage() {
       body: JSON.stringify({ orgId, subjects }),
     })
     if (!r.ok) {
-      toast.error('Verification failed')
+      toast.error(await verifyErrorMessage(r))
       return
     }
     notifyVerifiedCountChanged()

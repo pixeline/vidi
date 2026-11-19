@@ -20,6 +20,8 @@ export function SettingsView({
   accountsCount,
   country = null,
   onCountrySaved,
+  orgHandle = null,
+  onDisconnected,
 }: {
   role: string
   orgId: number
@@ -27,6 +29,8 @@ export function SettingsView({
   accountsCount: number | null
   country?: string | null
   onCountrySaved?: () => void
+  orgHandle?: string | null
+  onDisconnected?: () => void
 }) {
   const [seeds, setSeeds] = useState(initialSeeds)
   const [newKeyword, setNewKeyword] = useState('')
@@ -88,6 +92,18 @@ export function SettingsView({
       return
     }
     onCountrySaved?.()
+  }
+
+  async function disconnect() {
+    const label = orgHandle ? `@${orgHandle}` : 'this org'
+    if (!window.confirm(`Disconnect Vidi from ${label}? Members will no longer be able to verify until you onboard again.`)) return
+    const res = await fetch('/vidi/api/org/disconnect', { method: 'POST', body: JSON.stringify({ orgId }) })
+    if (!res.ok) {
+      toast.error('Could not disconnect Vidi')
+      return
+    }
+    toast.success('Vidi disconnected')
+    onDisconnected?.()
   }
 
   async function runCrawlNow() {
@@ -198,12 +214,29 @@ export function SettingsView({
           {running ? 'Starting…' : 'Run crawl now'}
         </Button>
       )}
+
+      {role === 'owner' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Disconnect Vidi</CardTitle>
+            <CardDescription>
+              Revokes Vidi&apos;s access to your verifier account. Members, backlog and activity history are kept.
+              Onboard again to reconnect.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" onClick={() => void disconnect()}>
+              {orgHandle ? `Disconnect Vidi from @${orgHandle}` : 'Disconnect Vidi'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
 export default function SettingsPage() {
-  const { orgId, role, loading, country, refresh } = useOrg()
+  const { orgId, role, loading, country, orgHandle, refresh } = useOrg()
   const [seeds, setSeeds] = useState<Seed[]>([])
   const [accountsCount, setAccountsCount] = useState<number | null>(null)
 
@@ -225,5 +258,5 @@ export default function SettingsPage() {
   }, [orgId, role])
 
   if (loading || !orgId || !role) return null
-  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} />
+  return <SettingsView role={role} orgId={orgId} seeds={seeds} accountsCount={accountsCount} country={country} onCountrySaved={refresh} orgHandle={orgHandle} onDisconnected={refresh} />
 }

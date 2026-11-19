@@ -3,7 +3,8 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { SettingsView } from '../../src/app/(app)/settings/page'
 
 const toastError = vi.fn()
-vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }))
+const toastSuccess = vi.fn()
+vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: (...a: unknown[]) => toastSuccess(...a) } }))
 
 describe('SettingsView country profile', () => {
   afterEach(cleanup)
@@ -30,6 +31,47 @@ describe('SettingsView country profile', () => {
   it('hides the country profile from a helper', () => {
     render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} country="BE" />)
     expect(screen.queryByLabelText('Country profile')).toBeNull()
+  })
+})
+
+describe('SettingsView disconnect', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('lets an owner disconnect Vidi after confirming', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) } as Response))
+    global.fetch = fetchMock
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const onDisconnected = vi.fn()
+    render(
+      <SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" onDisconnected={onDisconnected} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect Vidi from @belgium-atmosphe.re' }))
+    expect(confirm).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/vidi/api/org/disconnect',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ orgId: 1 }) }),
+      ),
+    )
+    await waitFor(() => expect(onDisconnected).toHaveBeenCalled())
+    expect(toastSuccess).toHaveBeenCalled()
+  })
+
+  it('does nothing when the confirm is cancelled', () => {
+    const fetchMock = vi.fn()
+    global.fetch = fetchMock as any
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<SettingsView role="owner" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" />)
+    fireEvent.click(screen.getByRole('button', { name: /disconnect vidi from/i }))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('hides the disconnect button from a helper', () => {
+    render(<SettingsView role="helper" orgId={1} seeds={[]} accountsCount={0} orgHandle="belgium-atmosphe.re" />)
+    expect(screen.queryByRole('button', { name: /disconnect vidi/i })).toBeNull()
   })
 })
 
