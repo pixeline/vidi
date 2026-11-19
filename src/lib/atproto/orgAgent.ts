@@ -12,3 +12,10 @@ export async function getOrgAgent(orgDid: string): Promise<Agent> {
   const session = await client.restore(orgDid)
   return new Agent(session)
 }
+
+/** The scope the org's stored session was actually granted. */
+export async function getOrgScope(orgDid: string): Promise<string> {
+  const client = await getOAuthClient()
+  const session = await client.restore(orgDid)
+  return (await session.getTokenInfo()).scope
+}

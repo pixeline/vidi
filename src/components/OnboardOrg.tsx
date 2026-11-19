@@ -18,7 +18,9 @@ export function OnboardOrg({ onOnboarded }: { onOnboarded: () => void }) {
             ? 'This account is not allowlisted to onboard an org.'
             : body?.error === 'no_org_session'
               ? 'Sign in as the org account before onboarding.'
-              : 'Could not onboard this org.'
+              : body?.error === 'missing_verification_scope'
+                ? "Sign out, then sign in again as the verifier account with 'I'm signing in as the verifier account' ticked."
+                : 'Could not onboard this org.'
         toast.error(message)
         return
       }

@@ -3,7 +3,9 @@ import { db } from '../../../../db/client'
 import { orgs, members } from '../../../../db/schema'
 import { getActor } from '../../../../lib/authz/session'
 import { isAllowlisted } from '../../../../lib/allowlist'
-import { getOrgAgent } from '../../../../lib/atproto/orgAgent'
+import { getOrgScope } from '../../../../lib/atproto/orgAgent'
+import { getPublicAppViewAgent } from '../../../../lib/atproto/publicAgent'
+import { hasVerificationScope } from '../../../../lib/atproto/oauthClient'
 
 export async function POST() {
   const actor = await getActor()
@@ -14,10 +16,21 @@ export async function POST() {
 
   // Prove we hold the org writer session: the owner must have logged in AS
   // the org account, so its OAuth session is stored under actor.did.
-  let agent, handle
+  let scope: string
   try {
-    agent = await getOrgAgent(actor.did)
-    const profile = await agent.getProfile({ actor: actor.did })
+    scope = await getOrgScope(actor.did)
+  } catch {
+    return NextResponse.json({ error: 'no_org_session' }, { status: 400 })
+  }
+  if (!hasVerificationScope(scope)) {
+    return NextResponse.json({ error: 'missing_verification_scope' }, { status: 400 })
+  }
+
+  // app.bsky.* reads go through the public AppView; a narrow-scope session
+  // cannot call proxied app.bsky methods.
+  let handle: string
+  try {
+    const profile = await getPublicAppViewAgent().getProfile({ actor: actor.did })
     handle = profile.data.handle
   } catch {
     return NextResponse.json({ error: 'no_org_session' }, { status: 400 })
@@ -29,7 +42,7 @@ export async function POST() {
       did: actor.did,
       handle,
       status: 'active',
-      scopes: 'atproto transition:generic',
+      scopes: scope,
       onboardedByDid: actor.did,
     })
     .onConflictDoUpdate({

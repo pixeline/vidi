@@ -18,6 +18,7 @@ type Suggestion = {
 export default function LoginPage() {
   const [handle, setHandle] = useState('')
   const [loading, setLoading] = useState(false)
+  const [asOrg, setAsOrg] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -34,7 +35,7 @@ export default function LoginPage() {
     try {
       const res = await fetch('/vidi/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ handle: handle.trim() }),
+        body: JSON.stringify({ handle: handle.trim(), asOrg }),
       })
       if (!res.ok) {
         toast.error('Could not start sign in')
@@ -181,6 +182,20 @@ export default function LoginPage() {
                   </ul>
                 )}
               </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="as-org" className="flex items-center gap-2 text-sm">
+                <input
+                  id="as-org"
+                  type="checkbox"
+                  checked={asOrg}
+                  onChange={(e) => setAsOrg(e.target.checked)}
+                />
+                I&apos;m signing in as the verifier account
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Vidi will only be able to create and delete verification records on this account.
+              </p>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in…' : 'Sign in'}
